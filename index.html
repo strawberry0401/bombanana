@@ -68,6 +68,15 @@
                 border: 2px solid var(--line); border-radius: 12px; }
   .join .big { width: auto; padding: 12px 20px; margin: 0; }
   .roles { font-size: 0.9rem; line-height: 1.6; }
+  .emotes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0; }
+  .emotes button { padding: 6px 0; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; font-size: 0.8rem; color: var(--ink); line-height: 1.3; }
+  .emotes button .e { font-size: 1.4rem; display: block; }
+  .emotes button.wide { grid-column: span 5; font-size: 0.95rem; }
+  .emotes button.wide .e { display: inline; }
+  #emotePop { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #fff; border: 4px solid #1c7ed6;
+              border-radius: 24px; padding: 16px 28px; text-align: center; box-shadow: 0 8px 30px #0004; z-index: 10; min-width: 220px; }
+  #emotePop .e { font-size: 3.2rem; display: block; line-height: 1.2; }
+  #emotePop .t { font-size: 1.2rem; font-weight: bold; }
   .voicebar { text-align: center; font-size: 0.9rem; margin: 6px 0; }
   .roleline { text-align: center; font-size: 1.05rem; margin: 0 0 10px; padding: 8px; border-radius: 10px; background: #fff1cf; }
   /* 🙈 안 보이는 원숭이: 세상이 까맣고 흑백, 해체 화면만 보여요 */
@@ -136,6 +145,7 @@
   </section>
 </main>
 
+<div id="emotePop" class="hidden"></div>
 <script src="supabase.js"></script>
 <script>
 // ===== Supabase 연결 정보 (공개용 키라서 코드에 넣어도 괜찮아요) =====
@@ -267,6 +277,16 @@ const PUMP_CODE_LEVEL = 11;   // 11단계부터는 안전장치 숫자를 맞혀
 const PUMP_CODE_EVERY = 30;   // 안전장치 숫자는 30초마다 바뀌어요
 function newPumpCode(g) { g.pumpKey = 1 + Math.floor(Math.random() * 9); g.pumpKeys = keysWith(g.pumpKey); }
 
+// ===== 🙊 감정표현: 손가락 1~10, 잘 모르겠어요, 다시 해 줘 =====
+function fingers(n) { // 손가락 개수를 손 모양 그림으로
+  const rest = { 0: '', 1: '☝️', 2: '✌️', 3: '✌️☝️', 4: '✌️✌️' };
+  return '🖐️'.repeat(Math.floor(n / 5)) + rest[n % 5];
+}
+const EMOTES = {};
+for (let n = 1; n <= 10; n++) EMOTES[n] = { e: fingers(n), t: `손가락 ${n}개` };
+EMOTES.unsure = { e: '🤔', t: '잘 모르겠어요 (머리 긁적)' };
+EMOTES.again = { e: '🔁✋', t: '다시 해 주세요' };
+
 // ===== 내 정보 =====
 const myId = Math.random().toString(36).slice(2, 10);
 let mode = null;      // 'host' | 'guest' | 'practice'
@@ -349,6 +369,10 @@ function handle(action) {
         if (g.safety <= 0) { g.safety = 100; strike('안전장치가 바닥났어요! ⚠️ 펌프를 계속 눌러 줘요.'); }
       }
       if (!g.over && g.timeLeft <= 0) endLevel(false, '시간이 다 됐어요! 💥 펑! 이 단계를 다시 해 봐요.');
+      break;
+    case 'emote': // 🙊만 감정표현을 보낼 수 있어요
+      if (!EMOTES[action.e] || (mode !== 'practice' && shared.players.mute !== action.id)) return;
+      shared.emote = { e: action.e, seq: (shared.emote ? shared.emote.seq : 0) + 1 };
       break;
     case 'pump':
       if (!g || g.over || !canTouch || !g.drain) return;
@@ -643,10 +667,10 @@ function manualHtml(m, level) {
     <p class="hint">${SYMBOL_ORDER.map(s => `${s} ${SYMBOL_NAMES[s]}`).join(', ')}</p>`;
 }
 
-// 해체 화면: 🙈와 🙉가 같은 모양을 봐요. 🙉(see)는 색과 그림이 보이지만 만질 수 없고, 🙈는 흑백에 점자만 보이고 만질 수 있어요
+// 해체 화면: 🙈와 🙉가 같은 모양을 봐요. 🙉(see)는 색과 그림이 보이지만 점자는 못 읽고 만질 수 없어요. 🙈는 흑백에 점자만 보이고 만질 수 있어요
 function bombHtml(m, mi, over, see) {
   const dis = m.solved || over || see ? 'disabled' : '';
-  const label = n => `<span class="braille">${braille(n)}</span>${see ? `<br><small>${n}</small>` : ''}`;
+  const label = n => `<span class="braille">${braille(n)}</span>`; // 점자는 🙈만 읽을 수 있어요
   const keys = (list, faces) => `<div class="keys">${list.map((n, k) => `<button class="key" data-m="${mi}" data-n="${n}" ${dis}>${faces ? `<span class="s" style="font-size:1.6rem">${faces[k]}</span><br>` : ''}${label(n)}</button>`).join('')}</div>`;
   if (m.type === 'wires') return m.wires.map((w, i) => `
     <div class="wire">
@@ -667,6 +691,23 @@ function bombHtml(m, mi, over, see) {
     ${see ? `<div class="light" data-code="${MORSE_TABLE[m.letter].code}"></div><p class="hint" style="text-align:center">불빛이 <b>짧게</b> 켜지는지 <b>길게</b> 켜지는지 말해 줘요.</p>`
       : '<p class="hint">💡 불빛이 깜빡이는 폭탄이에요. 나는 볼 수 없어요.</p>'}${keys(m.keys)}`;
   return `${see ? '' : '<p class="hint">🔣 문양이 그려진 폭탄이에요. 나는 볼 수 없어요.</p>'}${keys(m.keys, see ? m.syms.map(x => x.s) : null)}`;
+}
+
+// 새 감정표현이 오면 🙉 화면에 4초 동안 크게 보여 줘요
+let lastEmoteSeq = 0, emoteTimer = null;
+function showEmote() {
+  const em = shared.emote;
+  if (!em || em.seq === lastEmoteSeq) return;
+  const first = lastEmoteSeq === 0 && mode === 'guest' && !shared.game; // 방에 막 들어왔을 때 예전 것은 건너뛰어요
+  lastEmoteSeq = em.seq;
+  const pop = document.getElementById('emotePop');
+  const mine = myRole === 'mute' && mode !== 'practice';
+  if (first || !(myRole === 'deaf' || mode === 'practice' || mine)) return;
+  const x = EMOTES[em.e];
+  pop.innerHTML = mine ? `<span class="t">보냈어요: ${x.e} ${x.t}</span>` : `<span class="e">${x.e}</span><span class="t">${x.t}</span>`;
+  pop.classList.remove('hidden');
+  clearTimeout(emoteTimer);
+  emoteTimer = setTimeout(() => pop.classList.add('hidden'), mine ? 1500 : 4000);
 }
 
 // 마이크를 못 쓸 때 이유별 안내
@@ -745,6 +786,8 @@ function render() {
   document.getElementById('restartBtn').classList.toggle('hidden', !g || !g.over || (g.cleared && g.level === TOTAL_LEVELS));
   if (mode !== 'guest' || gotState) showGameMessage(shared.msg, shared.msgKind);
 
+  showEmote();
+
   const view = document.getElementById('view');
   if (!myRole) {
     const filled = Object.keys(shared.players).length;
@@ -766,16 +809,22 @@ function render() {
     view.innerHTML = roleLine + `<div class="manual">
       <p class="hint">🙊 말은 못 해요. 손가락 숫자, 고개 방향, 손짓으로만 알려 주세요.</p>
       ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">30초마다 바뀌어요. 🙉 친구에게 손가락으로 알려 줘요.</span></div>` : ''}
+      <div class="module"><h3>✋ 감정표현 보내기 <span class="hint">(🙉 친구 화면에 크게 떠요)</span></h3>
+        <div class="emotes">
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button class="emotebtn" data-e="${n}"><span class="e">${fingers(n)}</span>${n}</button>`).join('')}
+          <button class="emotebtn wide" data-e="unsure"><span class="e">🤔</span> 잘 모르겠어요</button>
+          <button class="emotebtn wide" data-e="again"><span class="e">🔁✋</span> 다시 해 주세요</button>
+        </div></div>
       <b>📖 ${g.level}단계 설명서</b> · 남은 폭탄 ${left}개
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : manualHtml(m, g.level)}</div>`).join('')}
     </div>`;
+    view.querySelectorAll('.emotebtn').forEach(b => b.onclick = () => act({ t: 'emote', e: b.dataset.e }));
   } else if (myRole === 'deaf') {
     view.innerHTML = roleLine + `
       ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 줄어들면 🙈 친구에게 "펌프!"라고 말해 줘요.${g.pumpKey ? ' 🙊 친구가 손으로 알려 주는 안전장치 숫자도 함께 전해 줘요.' : ''}
         <div class="gauge"><div class="${g.safety <= 30 ? 'low' : ''}" style="width:${Math.max(0, g.safety)}%"></div></div></div>` : ''}
-      <p class="hint">🙉 🙈 친구와 똑같은 해체 화면이지만 <b>색과 그림은 나만 보여요.</b> 친구들 말은 들리지 않으니 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요. 나는 폭탄을 만질 수 없어요.</p>
-      ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : bombHtml(m, i, g.over, true)}</div>`).join('')}
-      <div class="chart">${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}</div>`;
+      <p class="hint">🙉 🙈 친구와 똑같은 해체 화면이지만 <b>색과 그림은 나만 보여요.</b> 점자는 읽을 줄 몰라요. 친구들 말은 들리지 않으니 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요. 나는 폭탄을 만질 수 없어요.</p>
+      ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : bombHtml(m, i, g.over, true)}</div>`).join('')}`;
   } else {
     view.innerHTML = roleLine + `
       ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 나는 안전장치가 얼마나 남았는지 볼 수 없어요. 🙉 친구가 "펌프!"라고 하면 눌러요.
