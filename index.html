@@ -5,22 +5,27 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>딸기 봄바나나</title>
 <style>
-  :root { --bg: #fff8ec; --ink: #3a2a1e; --card: #ffffff; --line: #e8d9c0; --accent: #e8a317; --bad: #d64545; --good: #2f9e44; }
+  :root { --bg: #fff8ec; --ink: #3a2a1e; --card: #ffffff; --line: #e8d9c0; --accent: #e8a317; --bad: #d64545; --good: #2f9e44; --soft: #7a6650; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink);
          font-family: system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
   main { max-width: 560px; margin: 0 auto; padding: 12px 16px 40px; }
   h1 { font-size: 1.4rem; text-align: center; margin: 8px 0; }
+  .hidden { display: none !important; }
   .hud { display: flex; justify-content: space-between; font-weight: bold; margin: 8px 0; }
+  .room { text-align: center; color: var(--soft); margin: 4px 0; }
+  .room b { color: var(--ink); font-size: 1.2rem; letter-spacing: 3px; }
   .tabs { display: flex; gap: 6px; margin: 8px 0 12px; }
   .tabs button { flex: 1; padding: 10px 4px; border: 2px solid var(--line); background: var(--card);
                  border-radius: 12px; font-size: 0.95rem; cursor: pointer; color: var(--ink); }
   .tabs button.on { border-color: var(--accent); background: #fff1cf; font-weight: bold; }
-  .card { background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 14px; }
-  .hint { font-size: 0.9rem; color: #7a6650; margin: 0 0 10px; }
+  .tabs button:disabled { opacity: .45; cursor: default; }
+  .tabs small { display: block; font-size: 0.75rem; color: var(--soft); }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 12px; }
+  .hint { font-size: 0.9rem; color: var(--soft); margin: 0 0 10px; }
   .wire { display: flex; align-items: center; gap: 10px; padding: 8px 4px; border-bottom: 1px dashed var(--line); }
   .wire:last-child { border-bottom: 0; }
-  .pos { width: 52px; font-size: 0.85rem; color: #7a6650; }
+  .pos { width: 52px; font-size: 0.85rem; color: var(--soft); }
   .bar { flex: 1; height: 14px; border-radius: 7px; border: 1px solid #0003; }
   .bar.cut { background: repeating-linear-gradient(90deg, currentColor 0 40%, transparent 40% 60%, currentColor 60%) !important; opacity: .4; }
   .num { width: 64px; text-align: center; font-size: 1.3rem; font-weight: bold; }
@@ -33,36 +38,63 @@
   .chart .braille { font-size: 1.5rem; }
   .msg { text-align: center; font-weight: bold; min-height: 1.6em; margin: 10px 0; }
   .msg.bad { color: var(--bad); } .msg.good { color: var(--good); }
-  .big { display: block; margin: 12px auto; padding: 12px 28px; border: 0; border-radius: 999px;
+  .big { display: block; width: 100%; margin: 10px 0; padding: 14px; border: 0; border-radius: 999px;
          background: var(--accent); color: #fff; font-size: 1.05rem; cursor: pointer; }
+  .big.ghost { background: var(--card); color: var(--ink); border: 2px solid var(--line); }
+  .join { display: flex; gap: 8px; }
+  .join input { flex: 1; min-width: 0; padding: 12px; font-size: 1.2rem; letter-spacing: 4px; text-align: center;
+                border: 2px solid var(--line); border-radius: 12px; }
+  .join .big { width: auto; padding: 12px 20px; margin: 0; }
   .roles { font-size: 0.9rem; line-height: 1.6; }
 </style>
 </head>
 <body>
 <main>
   <h1>🐵 딸기 봄바나나 💣</h1>
-  <div class="hud">
-    <span>폭탄 <span id="round">1</span> / 3</span>
-    <span>⏱ <span id="time">3:00</span></span>
-    <span>실수 <span id="strikes">⚪⚪⚪</span></span>
-  </div>
-  <div class="tabs" id="tabs">
-    <button data-role="mute">🙊 설명서</button>
-    <button data-role="deaf">🙉 폭탄 보기</button>
-    <button data-role="blind">🙈 폭탄 해체</button>
-  </div>
-  <div class="card" id="view"></div>
-  <div class="msg" id="msg"></div>
-  <button class="big" id="startBtn">게임 시작</button>
-  <div class="card roles" id="intro">
-    <b>연습판</b>이에요. 한 기기에서 위 버튼으로 화면을 바꿔 가며 해 보세요.<br>
-    🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락과 고개로만 알려 줘요.<br>
-    🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말은 못 들어요.<br>
-    🙈 <b>눈이 안 보이는 원숭이</b>: 색을 볼 수 없고 숫자는 점자로만 보여요. 이 친구만 선을 자를 수 있어요.
-  </div>
+
+  <!-- 첫 화면 -->
+  <section id="home">
+    <div class="card">
+      <button class="big" id="createBtn">방 만들기</button>
+      <div class="join">
+        <input id="codeInput" inputmode="numeric" maxlength="4" placeholder="방 번호 4자리">
+        <button class="big" id="joinBtn">들어가기</button>
+      </div>
+      <button class="big ghost" id="practiceBtn">한 기기로 연습하기</button>
+    </div>
+    <div class="card roles">
+      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요.<br>
+      🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락과 고개로만 알려 줘요.<br>
+      🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말은 못 들어요.<br>
+      🙈 <b>눈이 안 보이는 원숭이</b>: 색을 볼 수 없고 숫자는 점자로만 보여요. 이 친구만 선을 자를 수 있어요.
+    </div>
+  </section>
+
+  <!-- 게임 화면 -->
+  <section id="game" class="hidden">
+    <div class="room" id="roomLine"></div>
+    <div class="hud">
+      <span>폭탄 <span id="round">-</span> / 3</span>
+      <span>⏱ <span id="time">3:00</span></span>
+      <span>실수 <span id="strikes">⚪⚪⚪</span></span>
+    </div>
+    <div class="tabs" id="tabs">
+      <button data-role="mute">🙊 설명서<small></small></button>
+      <button data-role="deaf">🙉 폭탄 보기<small></small></button>
+      <button data-role="blind">🙈 폭탄 해체<small></small></button>
+    </div>
+    <div class="card" id="view"></div>
+    <div class="msg" id="msg"></div>
+    <button class="big" id="startBtn">게임 시작</button>
+  </section>
 </main>
 
+<script src="supabase.js"></script>
 <script>
+// ===== Supabase 연결 정보 (공개용 키라서 코드에 넣어도 괜찮아요) =====
+const SUPABASE_URL = 'https://bmfihlddiyfeejrdrigm.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_Sfa_Oh-RP4WCrG9EjhSlXA_qcDusGOk';
+
 // ===== 게임 데이터 =====
 const COLORS = {
   red:    { name: '빨강', css: '#e03131' },
@@ -75,6 +107,7 @@ const COLOR_KEYS = Object.keys(COLORS);
 // 점자 숫자: 수표(⠼) 다음에 숫자 점형
 const BRAILLE_DIGITS = { 1: '⠁', 2: '⠃', 3: '⠉', 4: '⠙', 5: '⠑', 6: '⠋', 7: '⠛', 8: '⠓', 9: '⠊' };
 const braille = n => '⠼' + BRAILLE_DIGITS[n];
+const ROLE_NAMES = { mute: '🙊 말 못 하는 원숭이', deaf: '🙉 귀가 안 들리는 원숭이', blind: '🙈 눈이 안 보이는 원숭이' };
 
 const MANUAL = [
   '빨간 선이 하나도 없으면 → <b>두 번째</b> 선을 자르세요.',
@@ -84,9 +117,16 @@ const MANUAL = [
 ];
 const TOTAL_ROUNDS = 3, MAX_STRIKES = 3, TIME_LIMIT = 180;
 
-// ===== 게임 상태 (나중에 Supabase로 세 기기에 똑같이 나눠 줄 부분) =====
-let state = null;
-let role = 'mute';
+// ===== 내 정보 =====
+const myId = Math.random().toString(36).slice(2, 10);
+let mode = null;      // 'host' | 'guest' | 'practice'
+let roomCode = null;
+let myRole = null;
+let channel = null;
+let gotState = false; // 손님 기기가 방장에게서 상태를 받았는지
+
+// ===== 공유 상태: 방장(host) 기기가 가지고 있고, 바뀔 때마다 모두에게 보내요 =====
+let shared = { players: {}, game: null, msg: '', msgKind: '' };
 let timerId = null;
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -108,52 +148,137 @@ function solve(wires) {
   return 0;
 }
 
-function startGame() {
-  state = { round: 1, strikes: 0, timeLeft: TIME_LIMIT, bomb: makeBomb(), over: false };
-  document.getElementById('intro').style.display = 'none';
-  document.getElementById('startBtn').style.display = 'none';
-  setMsg('');
-  clearInterval(timerId);
-  timerId = setInterval(tick, 1000);
-  render();
-}
-
-function tick() {
-  if (state.over) return;
-  state.timeLeft--;
-  if (state.timeLeft <= 0) endGame(false, '시간이 다 됐어요! 💥 펑!');
-  render();
-}
-
-function cutWire(i) {
-  if (!state || state.over) return;
-  const w = state.bomb.wires[i];
-  if (w.cut) return;
-  w.cut = true;
-  if (i === state.bomb.answer) {
-    if (state.round === TOTAL_ROUNDS) return endGame(true, '폭탄 3개를 모두 해체했어요! 🎉 최고의 팀이에요!');
-    state.round++;
-    state.bomb = makeBomb();
-    setMsg('성공! 다음 폭탄이에요. 🍌', 'good');
-  } else {
-    state.strikes++;
-    if (state.strikes >= MAX_STRIKES) return endGame(false, '실수 3번! 💥 펑! 다시 해 봐요.');
-    setMsg('앗, 틀린 선이에요! 다시 이야기해 봐요.', 'bad');
+// ===== 방장만 실행: 행동을 받아서 상태를 바꿔요 =====
+function handle(action) {
+  const g = shared.game;
+  switch (action.t) {
+    case 'hello':
+      break; // 상태만 다시 보내 주면 돼요
+    case 'claim': {
+      const holder = shared.players[action.role];
+      if (holder && holder !== action.id) break; // 이미 다른 친구가 골랐어요
+      for (const r in shared.players) if (shared.players[r] === action.id) delete shared.players[r];
+      shared.players[action.role] = action.id;
+      break;
+    }
+    case 'start':
+      shared.game = { round: 1, strikes: 0, timeLeft: TIME_LIMIT, bomb: makeBomb(), over: false };
+      setMsg('');
+      clearInterval(timerId);
+      timerId = setInterval(() => handle({ t: 'tick' }), 1000);
+      break;
+    case 'tick':
+      if (!g || g.over) return;
+      g.timeLeft--;
+      if (g.timeLeft <= 0) endGame(false, '시간이 다 됐어요! 💥 펑!');
+      break;
+    case 'cut': {
+      if (!g || g.over) return;
+      if (mode !== 'practice' && shared.players.blind !== action.id) return; // 🙈만 자를 수 있어요
+      const w = g.bomb.wires[action.i];
+      if (!w || w.cut) return;
+      w.cut = true;
+      if (action.i === g.bomb.answer) {
+        if (g.round === TOTAL_ROUNDS) { endGame(true, '폭탄 3개를 모두 해체했어요! 🎉 최고의 팀이에요!'); break; }
+        g.round++;
+        g.bomb = makeBomb();
+        setMsg('성공! 다음 폭탄이에요. 🍌', 'good');
+      } else {
+        g.strikes++;
+        if (g.strikes >= MAX_STRIKES) endGame(false, '실수 3번! 💥 펑! 다시 해 봐요.');
+        else setMsg('앗, 틀린 선이에요! 다시 이야기해 봐요.', 'bad');
+      }
+      break;
+    }
   }
+  broadcastState();
   render();
 }
 
 function endGame(win, text) {
-  state.over = true;
+  shared.game.over = true;
   clearInterval(timerId);
   setMsg(text, win ? 'good' : 'bad');
-  const btn = document.getElementById('startBtn');
-  btn.textContent = '다시 하기';
-  btn.style.display = '';
+}
+
+function setMsg(text, kind) { shared.msg = text; shared.msgKind = kind || ''; }
+
+// ===== 통신 =====
+// 내 행동은 방장에게 보내고, 내가 방장이면 바로 처리해요
+function act(action) {
+  action.id = myId;
+  if (mode === 'host' || mode === 'practice') handle(action);
+  else send({ kind: 'action', action });
+}
+
+function broadcastState() {
+  if (mode === 'host') send({ kind: 'state', shared });
+}
+
+function send(payload) {
+  if (channel) channel.send({ type: 'broadcast', event: 'msg', payload });
+}
+
+function onMessage(payload) {
+  if (payload.kind === 'action' && mode === 'host') handle(payload.action);
+  if (payload.kind === 'state' && mode === 'guest') {
+    shared = payload.shared;
+    gotState = true;
+    for (const r in shared.players) if (shared.players[r] === myId) myRole = r;
+    if (myRole && shared.players[myRole] !== myId) myRole = null;
+    render();
+  }
+}
+
+function connect(code, onReady) {
+  const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  channel = client.channel('bombanana-' + code, { config: { broadcast: { self: false } } });
+  channel.on('broadcast', { event: 'msg' }, ({ payload }) => onMessage(payload));
+  channel.subscribe(status => {
+    if (status === 'SUBSCRIBED') onReady();
+    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      showGameMessage('연결이 안 돼요. 인터넷을 확인하고 다시 들어와 주세요.', 'bad');
+    }
+  });
+}
+
+// ===== 방 만들기 / 들어가기 / 연습 =====
+function openGame() {
+  document.getElementById('home').classList.add('hidden');
+  document.getElementById('game').classList.remove('hidden');
+}
+
+function createRoom() {
+  mode = 'host';
+  roomCode = String(1000 + Math.floor(Math.random() * 9000));
+  openGame();
+  render();
+  connect(roomCode, () => broadcastState());
+}
+
+function joinRoom() {
+  const code = document.getElementById('codeInput').value.trim();
+  if (!/^\d{4}$/.test(code)) { alert('방 번호 4자리를 넣어 주세요.'); return; }
+  mode = 'guest';
+  roomCode = code;
+  openGame();
+  showGameMessage('방에 연결하는 중이에요…');
+  connect(code, () => { act({ t: 'hello' }); setTimeout(checkHost, 3000); });
+}
+
+// 방장에게서 아무 응답이 없으면 방 번호가 틀렸을 수 있어요
+function checkHost() {
+  if (!gotState) showGameMessage('방을 찾을 수 없어요. 방 번호를 다시 확인해 주세요.', 'bad');
+}
+
+function startPractice() {
+  mode = 'practice';
+  myRole = 'mute';
+  openGame();
   render();
 }
 
-function setMsg(text, kind) {
+function showGameMessage(text, kind) {
   const el = document.getElementById('msg');
   el.textContent = text;
   el.className = 'msg ' + (kind || '');
@@ -161,17 +286,48 @@ function setMsg(text, kind) {
 
 // ===== 화면 그리기 =====
 function render() {
-  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.role === role));
-  const view = document.getElementById('view');
-  if (!state) { view.innerHTML = '<p class="hint">게임 시작을 누르면 폭탄이 나타나요.</p>'; return; }
+  const roomLine = document.getElementById('roomLine');
+  if (mode === 'practice') roomLine.innerHTML = '연습 모드: 위 버튼으로 화면을 바꿔 가며 해 보세요';
+  else roomLine.innerHTML = `방 번호 <b>${roomCode}</b>` + (mode === 'host' ? ' · 이 기기가 방장이에요 (끄면 게임이 멈춰요)' : '');
 
-  document.getElementById('round').textContent = state.round;
-  const t = Math.max(0, state.timeLeft);
+  // 원숭이 고르기 버튼
+  document.querySelectorAll('#tabs button').forEach(b => {
+    const r = b.dataset.role;
+    const holder = shared.players[r];
+    b.classList.toggle('on', myRole === r);
+    const small = b.querySelector('small');
+    if (mode === 'practice') { small.textContent = ''; b.disabled = false; return; }
+    small.textContent = holder === myId ? '나' : holder ? '친구가 골랐어요' : '비어 있어요';
+    b.disabled = !!holder && holder !== myId;
+  });
+
+  const g = shared.game;
+  document.getElementById('round').textContent = g ? g.round : '-';
+  const t = g ? Math.max(0, g.timeLeft) : TIME_LIMIT;
   document.getElementById('time').textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
-  document.getElementById('strikes').textContent = '❌'.repeat(state.strikes) + '⚪'.repeat(MAX_STRIKES - state.strikes);
+  const s = g ? g.strikes : 0;
+  document.getElementById('strikes').textContent = '❌'.repeat(s) + '⚪'.repeat(MAX_STRIKES - s);
 
-  const wires = state.bomb.wires;
-  if (role === 'mute') {
+  const startBtn = document.getElementById('startBtn');
+  startBtn.classList.toggle('hidden', !!g && !g.over);
+  startBtn.textContent = g && g.over ? '다시 하기' : '게임 시작';
+  if (mode !== 'guest' || gotState) showGameMessage(shared.msg, shared.msgKind);
+
+  const view = document.getElementById('view');
+  if (!myRole) {
+    const filled = Object.keys(shared.players).length;
+    view.innerHTML = `<p class="hint">위에서 내가 맡을 원숭이를 골라 주세요. (${filled} / 3명 골랐어요)</p>`;
+    return;
+  }
+  if (!g) {
+    const filled = Object.keys(shared.players).length;
+    view.innerHTML = `<p>나는 <b>${ROLE_NAMES[myRole]}</b>예요.</p>
+      <p class="hint">${mode === 'practice' ? '게임 시작을 누르면 폭탄이 나타나요.' : `세 명이 모두 고르면 게임 시작을 눌러요. (${filled} / 3명)`}</p>`;
+    return;
+  }
+
+  const wires = g.bomb.wires;
+  if (myRole === 'mute') {
     view.innerHTML = `
       <div class="manual">
         <p class="hint">🙊 말은 못 해요. 손가락 숫자와 고개 방향으로만 알려 주세요.</p>
@@ -179,7 +335,7 @@ function render() {
         <ol>${MANUAL.map(r => `<li>${r}</li>`).join('')}</ol>
         <p class="hint">선의 순서는 위에서부터 첫 번째, 두 번째… 로 세요.</p>
       </div>`;
-  } else if (role === 'deaf') {
+  } else if (myRole === 'deaf') {
     view.innerHTML = `
       <p class="hint">🙉 친구들 말은 들리지 않아요. 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요.</p>
       ${wires.map((w, i) => `
@@ -195,18 +351,25 @@ function render() {
         <div class="wire">
           <span class="bar ${w.cut ? 'cut' : ''}" style="background:#adb5bd;color:#adb5bd"></span>
           <span class="num braille">${braille(w.num)}</span>
-          <button class="cutbtn" data-i="${i}" ${w.cut || state.over ? 'disabled' : ''}>✂️ 자르기</button>
+          <button class="cutbtn" data-i="${i}" ${w.cut || g.over ? 'disabled' : ''}>✂️ 자르기</button>
         </div>`).join('')}
       <div class="chart">
         ${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}
       </div>`;
-    view.querySelectorAll('.cutbtn').forEach(b => b.onclick = () => cutWire(+b.dataset.i));
+    view.querySelectorAll('.cutbtn').forEach(b => b.onclick = () => act({ t: 'cut', i: +b.dataset.i }));
   }
 }
 
-document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => { role = b.dataset.role; render(); });
-document.getElementById('startBtn').onclick = startGame;
-render();
+document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
+  if (mode === 'practice') { myRole = b.dataset.role; render(); return; }
+  myRole = b.dataset.role; // 방장이 확인해 주면 확정돼요
+  act({ t: 'claim', role: b.dataset.role });
+  render();
+});
+document.getElementById('startBtn').onclick = () => act({ t: 'start' });
+document.getElementById('createBtn').onclick = createRoom;
+document.getElementById('joinBtn').onclick = joinRoom;
+document.getElementById('practiceBtn').onclick = startPractice;
 </script>
 </body>
 </html>
