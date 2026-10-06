@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>딸기 봄바나나</title>
+<title>폭탄원숭이</title>
 <style>
   :root { --bg: #fff8ec; --ink: #3a2a1e; --card: #ffffff; --line: #e8d9c0; --accent: #e8a317; --bad: #d64545; --good: #2f9e44; --soft: #7a6650; }
   * { box-sizing: border-box; }
@@ -17,7 +17,7 @@
   .room b { color: var(--ink); font-size: 1.2rem; letter-spacing: 3px; }
   .tabs { display: flex; gap: 6px; margin: 8px 0 12px; }
   .tabs button { flex: 1; padding: 10px 4px; border: 2px solid var(--line); background: var(--card);
-                 border-radius: 12px; font-size: 0.95rem; cursor: pointer; color: var(--ink); }
+                 border-radius: 12px; font-size: 0.85rem; line-height: 1.35; cursor: pointer; color: var(--ink); }
   .tabs button.on { border-color: var(--accent); background: #fff1cf; font-weight: bold; }
   .tabs button:disabled { opacity: .45; cursor: default; }
   .tabs small { display: block; font-size: 0.75rem; color: var(--soft); }
@@ -50,7 +50,7 @@
 </head>
 <body>
 <main>
-  <h1>🐵 딸기 봄바나나 💣</h1>
+  <h1>🐵 폭탄원숭이 💣</h1>
 
   <!-- 첫 화면 -->
   <section id="home">
@@ -63,7 +63,7 @@
       <button class="big ghost" id="practiceBtn">한 기기로 연습하기</button>
     </div>
     <div class="card roles">
-      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요.<br>
+      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요.<br>
       🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락과 고개로만 알려 줘요.<br>
       🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말은 못 들어요.<br>
       🙈 <b>눈이 안 보이는 원숭이</b>: 색을 볼 수 없고 숫자는 점자로만 보여요. 이 친구만 선을 자를 수 있어요.
@@ -74,18 +74,19 @@
   <section id="game" class="hidden">
     <div class="room" id="roomLine"></div>
     <div class="hud">
-      <span>폭탄 <span id="round">-</span> / 3</span>
+      <span>단계 <span id="round">-</span> / 20</span>
       <span>⏱ <span id="time">3:00</span></span>
       <span>실수 <span id="strikes">⚪⚪⚪</span></span>
     </div>
     <div class="tabs" id="tabs">
-      <button data-role="mute">🙊 설명서<small></small></button>
-      <button data-role="deaf">🙉 폭탄 보기<small></small></button>
-      <button data-role="blind">🙈 폭탄 해체<small></small></button>
+      <button data-role="mute">🙊 말을 못 하는 원숭이<br>(설명서)<small></small></button>
+      <button data-role="deaf">🙉 안 들리는 원숭이<br>(설명)<small></small></button>
+      <button data-role="blind">🙈 안 보이는 원숭이<br>(폭탄 해체)<small></small></button>
     </div>
     <div class="card" id="view"></div>
     <div class="msg" id="msg"></div>
     <button class="big" id="startBtn">게임 시작</button>
+    <button class="big ghost hidden" id="restartBtn">1단계부터 다시 하기</button>
   </section>
 </main>
 
@@ -109,13 +110,54 @@ const BRAILLE_DIGITS = { 1: '⠁', 2: '⠃', 3: '⠉', 4: '⠙', 5: '⠑', 6: '�
 const braille = n => '⠼' + BRAILLE_DIGITS[n];
 const ROLE_NAMES = { mute: '🙊 말 못 하는 원숭이', deaf: '🙉 귀가 안 들리는 원숭이', blind: '🙈 눈이 안 보이는 원숭이' };
 
-const MANUAL = [
-  '빨간 선이 하나도 없으면 → <b>두 번째</b> 선을 자르세요.',
-  '맨 마지막 선이 하양이면 → <b>마지막</b> 선을 자르세요.',
-  '파란 선이 2개 이상이면 → <b>마지막 파란 선</b>을 자르세요.',
-  '그 밖의 경우 → <b>첫 번째</b> 선을 자르세요.',
+// ===== 20단계 난이도 =====
+// 선이 몇 개인지, 어떤 색이 나오는지, 설명서 규칙, 폭탄 하나에 몇 번 잘라야 하는지
+const count = (ws, c) => ws.filter(w => w.color === c).length;
+const firstOf = (ws, c) => ws.findIndex(w => w.color === c);
+const lastOf = (ws, c) => ws.map(w => w.color).lastIndexOf(c);
+const maxNumAt = ws => ws.reduce((m, w, i) => (w.num > ws[m].num ? i : m), 0);
+const minNumAt = ws => ws.reduce((m, w, i) => (w.num < ws[m].num ? i : m), 0);
+
+// 규칙: text = 설명서 문장, when = 조건, cut = 남은 선 중 몇 번째(0부터)를 자를지
+const RULES_1 = [
+  { text: '빨간 선이 하나도 없으면 → <b>두 번째</b> 선', when: ws => count(ws, 'red') === 0, cut: () => 1 },
+  { text: '마지막 선이 파랑이면 → <b>마지막</b> 선', when: ws => ws[ws.length - 1].color === 'blue', cut: ws => ws.length - 1 },
+  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
 ];
-const TOTAL_ROUNDS = 3, MAX_STRIKES = 3, TIME_LIMIT = 180;
+const RULES_2 = [
+  { text: '빨간 선이 하나도 없으면 → <b>두 번째</b> 선', when: ws => count(ws, 'red') === 0, cut: () => 1 },
+  { text: '마지막 선이 하양이면 → <b>마지막</b> 선', when: ws => ws[ws.length - 1].color === 'white', cut: ws => ws.length - 1 },
+  { text: '파란 선이 2개 이상이면 → <b>마지막 파란 선</b>', when: ws => count(ws, 'blue') >= 2, cut: ws => lastOf(ws, 'blue') },
+  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
+];
+const RULES_3 = [
+  { text: '검정 선이 2개 이상이면 → <b>첫 번째 검정 선</b>', when: ws => count(ws, 'black') >= 2, cut: ws => firstOf(ws, 'black') },
+  { text: '노란 선이 딱 1개면 → <b>그 노란 선</b>', when: ws => count(ws, 'yellow') === 1, cut: ws => firstOf(ws, 'yellow') },
+  { text: '첫 번째 선의 숫자가 홀수면 → <b>세 번째</b> 선', when: ws => ws[0].num % 2 === 1, cut: () => 2 },
+  { text: '빨간 선이 파란 선보다 많으면 → <b>마지막 빨간 선</b>', when: ws => count(ws, 'red') > count(ws, 'blue'), cut: ws => lastOf(ws, 'red') },
+  { text: '그 밖의 경우 → <b>두 번째</b> 선', when: () => true, cut: () => 1 },
+];
+const RULES_5 = [
+  { text: '하얀 선이 하나도 없으면 → <b>마지막</b> 선', when: ws => count(ws, 'white') === 0, cut: ws => ws.length - 1 },
+  { text: '숫자가 가장 큰 선이 빨강이면 → <b>숫자가 가장 큰</b> 선', when: ws => ws[maxNumAt(ws)].color === 'red', cut: maxNumAt },
+  { text: '노란 선이 2개 이상이면 → <b>첫 번째 노란 선</b>', when: ws => count(ws, 'yellow') >= 2, cut: ws => firstOf(ws, 'yellow') },
+  { text: '첫 번째 선과 마지막 선의 색이 같으면 → <b>두 번째</b> 선', when: ws => ws[0].color === ws[ws.length - 1].color, cut: () => 1 },
+  { text: '짝수가 적힌 선이 3개 이상이면 → <b>숫자가 가장 작은</b> 선', when: ws => ws.filter(w => w.num % 2 === 0).length >= 3, cut: minNumAt },
+  { text: '그 밖의 경우 → <b>세 번째</b> 선', when: () => true, cut: () => 2 },
+];
+
+const C3 = ['red', 'blue', 'yellow'];
+const C4 = ['red', 'blue', 'yellow', 'white'];
+const C5 = ['red', 'blue', 'yellow', 'white', 'black'];
+// 1~4단계 아주 쉬움 → 17~20단계 가장 어려움
+function levelInfo(level) {
+  if (level <= 4)  return { min: 3, max: 4, colors: C3, rules: RULES_1, cuts: 1 };
+  if (level <= 8)  return { min: 4, max: 5, colors: C4, rules: RULES_2, cuts: 1 };
+  if (level <= 12) return { min: 5, max: 6, colors: C5, rules: RULES_3, cuts: 1 };
+  if (level <= 16) return { min: 5, max: 6, colors: C5, rules: RULES_3, cuts: 2 };
+  return { min: 6, max: 7, colors: C5, rules: RULES_5, cuts: 3 };
+}
+const TOTAL_LEVELS = 20, MAX_STRIKES = 3, TIME_LIMIT = 180;
 
 // ===== 내 정보 =====
 const myId = Math.random().toString(36).slice(2, 10);
@@ -131,21 +173,29 @@ let timerId = null;
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-function makeBomb() {
-  const count = 3 + Math.floor(Math.random() * 4); // 선 3~6개
+function makeBomb(level) {
+  const info = levelInfo(level);
+  const n = info.min + Math.floor(Math.random() * (info.max - info.min + 1));
   const nums = [1, 2, 3, 4, 5, 6, 7, 8, 9].sort(() => Math.random() - 0.5);
   const wires = [];
-  for (let i = 0; i < count; i++) wires.push({ color: pick(COLOR_KEYS), num: nums[i], cut: false });
-  return { wires, answer: solve(wires) };
+  for (let i = 0; i < n; i++) wires.push({ color: pick(info.colors), num: nums[i], cut: false });
+  return { wires, cutsLeft: info.cuts };
 }
 
-// 설명서 규칙대로 잘라야 할 선의 위치(0부터)
-function solve(wires) {
-  const colors = wires.map(w => w.color);
-  if (!colors.includes('red')) return 1;
-  if (colors[colors.length - 1] === 'white') return wires.length - 1;
-  if (colors.filter(c => c === 'blue').length >= 2) return colors.lastIndexOf('blue');
-  return 0;
+// 아직 안 자른 선만 위에서부터 다시 세요
+const remaining = bomb => bomb.wires.map((w, i) => ({ ...w, i })).filter(w => !w.cut);
+
+// 설명서 규칙대로 지금 잘라야 할 선(원래 위치)
+function answerIndex(level, bomb) {
+  const ws = remaining(bomb);
+  const rule = levelInfo(level).rules.find(r => r.when(ws));
+  return ws[rule.cut(ws)].i;
+}
+
+function startLevel(level) {
+  shared.game = { level, strikes: 0, timeLeft: TIME_LIMIT, bomb: makeBomb(level), over: false, cleared: false };
+  clearInterval(timerId);
+  timerId = setInterval(() => handle({ t: 'tick' }), 1000);
 }
 
 // ===== 방장만 실행: 행동을 받아서 상태를 바꿔요 =====
@@ -161,31 +211,38 @@ function handle(action) {
       shared.players[action.role] = action.id;
       break;
     }
-    case 'start':
-      shared.game = { round: 1, strikes: 0, timeLeft: TIME_LIMIT, bomb: makeBomb(), over: false };
+    case 'start': // 처음 시작 / 다음 단계 / 이 단계 다시 하기
+      if (!g) startLevel(1);
+      else if (g.cleared && g.level < TOTAL_LEVELS) startLevel(g.level + 1);
+      else if (g.cleared) startLevel(1);
+      else if (g.over) startLevel(g.level);
+      else return;
       setMsg('');
-      clearInterval(timerId);
-      timerId = setInterval(() => handle({ t: 'tick' }), 1000);
+      break;
+    case 'restart':
+      startLevel(1);
+      setMsg('');
       break;
     case 'tick':
       if (!g || g.over) return;
       g.timeLeft--;
-      if (g.timeLeft <= 0) endGame(false, '시간이 다 됐어요! 💥 펑!');
+      if (g.timeLeft <= 0) endLevel(false, '시간이 다 됐어요! 💥 펑! 이 단계를 다시 해 봐요.');
       break;
     case 'cut': {
       if (!g || g.over) return;
       if (mode !== 'practice' && shared.players.blind !== action.id) return; // 🙈만 자를 수 있어요
       const w = g.bomb.wires[action.i];
       if (!w || w.cut) return;
+      const correct = action.i === answerIndex(g.level, g.bomb);
       w.cut = true;
-      if (action.i === g.bomb.answer) {
-        if (g.round === TOTAL_ROUNDS) { endGame(true, '폭탄 3개를 모두 해체했어요! 🎉 최고의 팀이에요!'); break; }
-        g.round++;
-        g.bomb = makeBomb();
-        setMsg('성공! 다음 폭탄이에요. 🍌', 'good');
+      if (correct) {
+        g.bomb.cutsLeft--;
+        if (g.bomb.cutsLeft > 0) setMsg(`맞았어요! 이 폭탄은 ${g.bomb.cutsLeft}번 더 잘라야 해요.`, 'good');
+        else if (g.level === TOTAL_LEVELS) endLevel(true, '20단계까지 모두 해체했어요! 🎉 최고의 원숭이 팀이에요!');
+        else endLevel(true, `${g.level}단계 성공! 🍌 준비되면 다음 단계를 눌러요.`);
       } else {
         g.strikes++;
-        if (g.strikes >= MAX_STRIKES) endGame(false, '실수 3번! 💥 펑! 다시 해 봐요.');
+        if (g.strikes >= MAX_STRIKES) endLevel(false, '실수 3번! 💥 펑! 이 단계를 다시 해 봐요.');
         else setMsg('앗, 틀린 선이에요! 다시 이야기해 봐요.', 'bad');
       }
       break;
@@ -195,8 +252,9 @@ function handle(action) {
   render();
 }
 
-function endGame(win, text) {
+function endLevel(win, text) {
   shared.game.over = true;
+  shared.game.cleared = win;
   clearInterval(timerId);
   setMsg(text, win ? 'good' : 'bad');
 }
@@ -302,7 +360,7 @@ function render() {
   });
 
   const g = shared.game;
-  document.getElementById('round').textContent = g ? g.round : '-';
+  document.getElementById('round').textContent = g ? g.level : '-';
   const t = g ? Math.max(0, g.timeLeft) : TIME_LIMIT;
   document.getElementById('time').textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
   const s = g ? g.strikes : 0;
@@ -310,7 +368,11 @@ function render() {
 
   const startBtn = document.getElementById('startBtn');
   startBtn.classList.toggle('hidden', !!g && !g.over);
-  startBtn.textContent = g && g.over ? '다시 하기' : '게임 시작';
+  startBtn.textContent = !g ? '게임 시작'
+    : g.cleared && g.level < TOTAL_LEVELS ? `${g.level + 1}단계 시작`
+    : g.cleared ? '처음부터 다시 하기'
+    : `${g.level}단계 다시 하기`;
+  document.getElementById('restartBtn').classList.toggle('hidden', !g || !g.over || (g.cleared && g.level === TOTAL_LEVELS));
   if (mode !== 'guest' || gotState) showGameMessage(shared.msg, shared.msgKind);
 
   const view = document.getElementById('view');
@@ -331,16 +393,17 @@ function render() {
     view.innerHTML = `
       <div class="manual">
         <p class="hint">🙊 말은 못 해요. 손가락 숫자와 고개 방향으로만 알려 주세요.</p>
-        <b>📖 폭탄 해체 설명서</b> (위에서부터 차례로 확인)
-        <ol>${MANUAL.map(r => `<li>${r}</li>`).join('')}</ol>
-        <p class="hint">선의 순서는 위에서부터 첫 번째, 두 번째… 로 세요.</p>
+        <b>📖 ${g.level}단계 설명서</b> (위에서부터 차례로 확인해서 처음 맞는 규칙대로)
+        <ol>${levelInfo(g.level).rules.map(r => `<li>${r.text}을 자르세요.</li>`).join('')}</ol>
+        <p class="hint">이 폭탄은 <b>${g.bomb.cutsLeft}번</b> 더 잘라야 해요.${levelInfo(g.level).cuts > 1 ? ' 한 번 자를 때마다 남은 선으로 다시 처음부터 확인해요.' : ''}<br>
+        선의 순서는 <b>아직 안 자른 선</b>만 위에서부터 첫 번째, 두 번째… 로 세요.</p>
       </div>`;
   } else if (myRole === 'deaf') {
     view.innerHTML = `
       <p class="hint">🙉 친구들 말은 들리지 않아요. 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요.</p>
       ${wires.map((w, i) => `
         <div class="wire">
-          <span class="pos">${i + 1}번째</span>
+          <span class="pos">${w.cut ? '잘림' : wires.slice(0, i).filter(x => !x.cut).length + 1 + '번째'}</span>
           <span class="bar ${w.cut ? 'cut' : ''}" style="background:${COLORS[w.color].css};color:${COLORS[w.color].css}"></span>
           <span class="num">${w.num}</span>
         </div>`).join('')}`;
@@ -367,6 +430,7 @@ document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
   render();
 });
 document.getElementById('startBtn').onclick = () => act({ t: 'start' });
+document.getElementById('restartBtn').onclick = () => act({ t: 'restart' });
 document.getElementById('createBtn').onclick = createRoom;
 document.getElementById('joinBtn').onclick = joinRoom;
 document.getElementById('practiceBtn').onclick = startPractice;
