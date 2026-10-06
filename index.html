@@ -483,13 +483,17 @@ function showGameMessage(text, kind) {
 
 // ===== 게임 안 음성 채팅 (WebRTC, 신호는 Supabase 채널로 주고받아요) =====
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
-let localStream = null, voiceOn = false, voiceDenied = false;
+let localStream = null, voiceOn = false, voiceError = null, listenOnly = false;
 const peers = {}; // 친구 id → { pc, audio, pending }
 
+// 버튼을 누르면 브라우저의 마이크 허용 창이 떠요
 async function enableVoice() {
   try {
+    if (!navigator.mediaDevices) throw { name: 'NoMedia' };
     localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
-  } catch (e) { voiceDenied = true; render(); return; }
+    listenOnly = false;
+  } catch (e) { voiceError = e.name || 'Error'; render(); return; }
+  voiceError = null;
   voiceOn = true;
   sendVoice('hello');
   applyVoiceRules();
@@ -504,6 +508,7 @@ function peerFor(id) {
   const audio = new Audio();
   audio.autoplay = true;
   localStream.getTracks().forEach(tr => pc.addTrack(tr, localStream));
+  if (!localStream.getTracks().length) pc.addTransceiver('audio', { direction: 'recvonly' }); // 듣기만 해요
   pc.ontrack = e => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); applyVoiceRules(); };
   pc.onicecandidate = e => { if (e.candidate) sendVoice('ice', id, e.candidate.toJSON()); };
   pc.onconnectionstatechange = () => {
@@ -542,6 +547,16 @@ async function onVoice(p) {
     peer.pending.push(p.data);
     if (peer.pc.remoteDescription) flushIce(peer);
   }
+}
+
+// 마이크 없이 듣기만 하기
+function listenOnlyVoice() {
+  localStream = new MediaStream();
+  listenOnly = true;
+  voiceError = null;
+  voiceOn = true;
+  sendVoice('hello');
+  render();
 }
 
 // 역할에 따라: 🙊는 내 마이크가 꺼지고, 🙉는 친구 목소리와 게임 소리가 안 들려요
@@ -644,6 +659,22 @@ function blindHtml(m, mi, over) {
   return `<p class="hint">🔣 문양이 그려진 폭탄이에요. 나는 볼 수 없어요.</p>${keys(m.keys)}`;
 }
 
+// 마이크를 못 쓸 때 이유별 안내
+function micHelp(err) {
+  const why = err === 'NotFoundError' ? '이 기기에 마이크가 없어요. 마이크가 달린 이어폰을 꽂고 다시 눌러 주세요.'
+    : err === 'NotReadableError' ? '다른 프로그램이 마이크를 쓰고 있어요. 그 프로그램을 끄고 다시 눌러 주세요.'
+    : err === 'NoMedia' ? '이 브라우저는 마이크를 쓸 수 없어요. 크롬이나 사파리로 열어 주세요.'
+    : '마이크가 막혀 있어요. 아래 방법으로 허용한 뒤 새로고침해 주세요.';
+  return `<div class="card hint" style="text-align:left">🎤 <b>${why}</b>
+    <ul style="margin:6px 0;padding-left:18px">
+      <li><b>컴퓨터(크롬)</b>: 주소창 왼쪽 자물쇠(또는 ⚙) 아이콘 → <b>마이크</b>를 <b>허용</b>으로 → 새로고침</li>
+      <li><b>안드로이드 폰(크롬)</b>: 주소창 왼쪽 아이콘 → <b>권한</b> → <b>마이크</b> 허용 → 새로고침</li>
+      <li><b>아이폰/아이패드(사파리)</b>: 주소창 <b>가가</b>(또는 aA) → <b>웹 사이트 설정</b> → <b>마이크: 허용</b> → 새로고침</li>
+    </ul>
+    <button class="big small" id="voiceBtn">🎤 다시 허용하기</button>
+    <button class="big small ghost" id="listenBtn">🎧 마이크 없이 듣기만 하기</button></div>`;
+}
+
 function render() {
   const roomLine = document.getElementById('roomLine');
   if (mode === 'practice') roomLine.innerHTML = '연습 모드: 위 버튼으로 화면을 바꿔 가며 해 보세요';
@@ -670,14 +701,13 @@ function render() {
   // 음성 채팅 상태
   const voiceBar = document.getElementById('voiceBar');
   if (mode === 'practice') voiceBar.innerHTML = '';
-  else if (!voiceOn) voiceBar.innerHTML = voiceDenied
-    ? '🎤 마이크를 쓸 수 없어요. 브라우저에서 마이크를 허용하고 새로고침해 주세요.'
-    : '<button class="big small" id="voiceBtn">🎧 음성 채팅 켜기 (이어폰을 껴 주세요)</button>';
+  else if (!voiceOn) voiceBar.innerHTML = voiceError ? micHelp(voiceError)
+    : '<button class="big small" id="voiceBtn">🎧 음성 채팅 켜기 (이어폰을 껴 주세요)</button><br><span class="hint">누르면 마이크 허용 창이 떠요. <b>허용</b>을 눌러 주세요.</span>';
   else {
     const n = Object.values(peers).filter(p => p.pc.connectionState === 'connected').length;
     const note = inRound() && myRole === 'mute' ? ' · 🔇 이번 단계는 내 마이크가 꺼져요'
       : inRound() && myRole === 'deaf' ? ' · 🔇 이번 단계는 친구 목소리와 게임 소리가 안 들려요' : '';
-    voiceBar.innerHTML = `🎧 음성 연결된 친구 <b>${n}</b>명${note}`;
+    voiceBar.innerHTML = `🎧 음성 연결된 친구 <b>${n}</b>명${listenOnly ? ' · 🎤 마이크 없이 듣기만 해요' : ''}${note}`;
   }
   applyVoiceRules();
 
@@ -761,7 +791,10 @@ document.getElementById('restartBtn').onclick = () => act({ t: 'restart' });
 document.getElementById('createBtn').onclick = createRoom;
 document.getElementById('joinBtn').onclick = joinRoom;
 document.getElementById('practiceBtn').onclick = startPractice;
-document.getElementById('voiceBar').onclick = e => { if (e.target.id === 'voiceBtn') enableVoice(); };
+document.getElementById('voiceBar').onclick = e => {
+  if (e.target.id === 'voiceBtn') enableVoice();
+  if (e.target.id === 'listenBtn') listenOnlyVoice();
+};
 </script>
 </body>
 </html>
