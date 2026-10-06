@@ -127,7 +127,8 @@
 <script>
 // ===== Supabase 연결 정보 (공개용 키라서 코드에 넣어도 괜찮아요) =====
 const SUPABASE_URL = 'https://bmfihlddiyfeejrdrigm.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_Sfa_Oh-RP4WCrG9EjhSlXA_qcDusGOk';
+// 실시간 채널 참여가 확실히 되도록 anon 공개 키를 써요
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJtZmlobGRkaXlmZWVqcmRyaWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEyNTUwNzIsImV4cCI6MjEwNjgzMTA3Mn0.8EHC-CI5fz0yg9hF2Cp0uSfI1dZuUz5yS-MUaAdcCbc';
 
 // ===== 기본 데이터 =====
 const COLORS = {
@@ -410,10 +411,11 @@ function connect(code, onReady) {
   const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
   channel = client.channel('bombanana-' + code, { config: { broadcast: { self: false } } });
   channel.on('broadcast', { event: 'msg' }, ({ payload }) => onMessage(payload));
-  channel.subscribe(status => {
+  channel.subscribe((status, err) => {
     if (status === 'SUBSCRIBED') onReady();
     else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-      showGameMessage('연결이 안 돼요. 인터넷을 확인하고 다시 들어와 주세요.', 'bad');
+      console.warn('채널 연결 실패', status, err);
+      showGameMessage(`연결이 안 돼요. 인터넷을 확인하고 다시 들어와 주세요. (${status}${err && err.message ? ': ' + err.message : ''})`, 'bad');
     }
   });
 }
