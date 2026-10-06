@@ -60,6 +60,7 @@
   .msg.bad { color: var(--bad); } .msg.good { color: var(--good); }
   .big { display: block; width: 100%; margin: 10px 0; padding: 14px; border: 0; border-radius: 999px;
          background: var(--accent); color: #fff; font-size: 1.05rem; cursor: pointer; }
+  .big:disabled { opacity: .45; cursor: default; }
   .big.ghost { background: var(--card); color: var(--ink); border: 2px solid var(--line); }
   .big.small { width: auto; display: inline-block; padding: 8px 18px; margin: 4px; font-size: 0.95rem; }
   .join { display: flex; gap: 8px; }
@@ -84,7 +85,7 @@
       <button class="big ghost" id="practiceBtn">한 기기로 연습하기</button>
     </div>
     <div class="card roles">
-      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요.<br>
+      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요.<br>
       🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락, 고개, 손짓으로만 알려 줘요.<br>
       🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말과 폭탄 소리는 못 들어요.<br>
       🙈 <b>눈이 안 보이는 원숭이</b>: 색과 그림을 볼 수 없고 숫자는 점자로만 보여요. 소리는 들을 수 있어요. 이 친구만 폭탄을 만질 수 있어요.
@@ -206,13 +207,16 @@ function makeModule(type, level) {
     const t = wireTier(level);
     const n = t.min + Math.floor(Math.random() * (t.max - t.min + 1));
     const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    return { type, wires: Array.from({ length: n }, (_, i) => ({ color: pick(t.colors), num: nums[i], cut: false })) };
+    // 🙈 화면에서는 선 순서를 섞어서, 위치가 아니라 점자 숫자로만 찾게 해요
+    return { type, wires: Array.from({ length: n }, (_, i) => ({ color: pick(t.colors), num: nums[i], cut: false })),
+             blindOrder: shuffle([...Array(n).keys()]) };
   }
   if (type === 'button') return { type, color: pick(BUTTON_COLORS), word: pick(BUTTON_WORDS), presses: 0 };
   if (type === 'sound') { const pattern = pick(Object.keys(SOUND_TABLE)); return { type, pattern, keys: keysWith(SOUND_TABLE[pattern]) }; }
   if (type === 'morse') { const letter = pick(Object.keys(MORSE_TABLE)); return { type, letter, keys: keysWith(MORSE_TABLE[letter].num) }; }
   const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-  return { type, syms: shuffle(SYMBOL_ORDER).slice(0, 4).map((s, i) => ({ s, num: nums[i] })) };
+  const syms = shuffle(SYMBOL_ORDER).slice(0, 4).map((s, i) => ({ s, num: nums[i] }));
+  return { type, syms, keys: shuffle(syms.map(x => x.num)) }; // 🙈 버튼 순서는 🙉 화면과 달라요
 }
 
 // 각 폭탄의 정답
@@ -240,6 +244,9 @@ function levelPlan(level) {
   return { types, drain };
 }
 const PUMP_ADD = 25;
+const PUMP_CODE_LEVEL = 11;   // 11단계부터는 안전장치 숫자를 맞혀야 펌프가 돼요
+const PUMP_CODE_EVERY = 20;   // 안전장치 숫자는 20초마다 바뀌어요
+function newPumpCode(g) { g.pumpKey = 1 + Math.floor(Math.random() * 9); g.pumpKeys = keysWith(g.pumpKey); }
 
 // ===== 내 정보 =====
 const myId = Math.random().toString(36).slice(2, 10);
@@ -260,6 +267,7 @@ function startLevel(level) {
     drain: plan.drain, safety: 100,
     modules: plan.types.map(t => ({ ...makeModule(t, level), solved: false })),
   };
+  if (level >= PUMP_CODE_LEVEL) newPumpCode(shared.game);
   clearInterval(timerId);
   timerId = setInterval(() => handle({ t: 'tick' }), 1000);
 }
@@ -296,6 +304,7 @@ function handle(action) {
       break;
     }
     case 'start': // 처음 시작 / 다음 단계 / 이 단계 다시 하기
+      if (mode !== 'practice' && Object.keys(shared.players).length < 3) return; // 세 원숭이가 모두 있어야 해요
       if (!g) startLevel(1);
       else if (g.cleared && g.level < TOTAL_LEVELS) startLevel(g.level + 1);
       else if (g.cleared) startLevel(1);
@@ -311,6 +320,7 @@ function handle(action) {
       if (!g || g.over) return;
       g.timeLeft--;
       if (g.drain) {
+        if (g.pumpKey && g.timeLeft % PUMP_CODE_EVERY === 0) newPumpCode(g);
         g.safety -= g.drain;
         if (g.safety <= 0) { g.safety = 100; strike('안전장치가 바닥났어요! ⚠️ 펌프를 계속 눌러 줘요.'); }
       }
@@ -318,6 +328,7 @@ function handle(action) {
       break;
     case 'pump':
       if (!g || g.over || !canTouch || !g.drain) return;
+      if (g.pumpKey && action.n !== g.pumpKey) { setMsg('앗, 안전장치 숫자가 틀렸어요! 🙊 친구에게 물어봐요.', 'bad'); break; }
       g.safety = Math.min(100, g.safety + PUMP_ADD);
       break;
     case 'cut': // 선 자르기
@@ -507,7 +518,7 @@ function deafHtml(m) {
 function blindHtml(m, mi, over) {
   const dis = m.solved || over ? 'disabled' : '';
   const keys = list => `<div class="keys">${list.map(n => `<button class="key" data-m="${mi}" data-n="${n}" ${dis}><span class="braille">${braille(n)}</span></button>`).join('')}</div>`;
-  if (m.type === 'wires') return m.wires.map((w, i) => `
+  if (m.type === 'wires') return m.blindOrder.map(i => [m.wires[i], i]).map(([w, i]) => `
     <div class="wire">
       <span class="bar ${w.cut ? 'cut' : ''}" style="background:#adb5bd;color:#adb5bd"></span>
       <span class="num braille">${braille(w.num)}</span>
@@ -521,7 +532,7 @@ function blindHtml(m, mi, over) {
     <div class="row"><button class="big small playsound" data-m="${mi}">🔊 소리 듣기</button></div>
     <p class="hint">들은 소리를 큰 소리로 말해 줘요. (삐 = 높은 소리, 뽀 = 낮은 소리)</p>${keys(m.keys)}`;
   if (m.type === 'morse') return `<p class="hint">💡 불빛이 깜빡이는 폭탄이에요. 나는 볼 수 없어요.</p>${keys(m.keys)}`;
-  return `<p class="hint">🔣 문양이 그려진 폭탄이에요. 나는 볼 수 없어요.</p>${keys(m.syms.map(x => x.num))}`;
+  return `<p class="hint">🔣 문양이 그려진 폭탄이에요. 나는 볼 수 없어요.</p>${keys(m.keys)}`;
 }
 
 function render() {
@@ -549,6 +560,7 @@ function render() {
 
   const startBtn = document.getElementById('startBtn');
   startBtn.classList.toggle('hidden', !!g && !g.over);
+  startBtn.disabled = mode !== 'practice' && Object.keys(shared.players).length < 3;
   startBtn.textContent = !g ? '게임 시작'
     : g.cleared && g.level < TOTAL_LEVELS ? `${g.level + 1}단계 시작`
     : g.cleared ? '처음부터 다시 하기'
@@ -575,19 +587,22 @@ function render() {
   if (myRole === 'mute') {
     view.innerHTML = `<div class="manual">
       <p class="hint">🙊 말은 못 해요. 손가락 숫자, 고개 방향, 손짓으로만 알려 주세요.</p>
+      ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">20초마다 바뀌어요. 🙉 친구에게 손가락으로 알려 줘요.</span></div>` : ''}
       <b>📖 ${g.level}단계 설명서</b> · 남은 폭탄 ${left}개
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : manualHtml(m, g.level)}</div>`).join('')}
     </div>`;
   } else if (myRole === 'deaf') {
     view.innerHTML = `
+      ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 줄어들면 🙈 친구에게 "펌프!"라고 말해 줘요.${g.pumpKey ? ' 🙊 친구가 손으로 알려 주는 안전장치 숫자도 함께 전해 줘요.' : ''}
+        <div class="gauge"><div class="${g.safety <= 30 ? 'low' : ''}" style="width:${Math.max(0, g.safety)}%"></div></div></div>` : ''}
       <p class="hint">🙉 친구들 말은 들리지 않아요. 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요.</p>
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : deafHtml(m)}</div>`).join('')}`;
   } else {
-    const low = g.safety <= 30;
     view.innerHTML = `
-      ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 계속 줄어들어요. 펌프를 눌러서 채워 주세요!
-        <div class="gauge"><div class="${low ? 'low' : ''}" style="width:${Math.max(0, g.safety)}%"></div></div>
-        <button class="big small pumpbtn" ${g.over ? 'disabled' : ''}>💪 펌프</button></div>` : ''}
+      ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 나는 안전장치가 얼마나 남았는지 볼 수 없어요. 🙉 친구가 "펌프!"라고 하면 눌러요.
+        ${g.pumpKey ? `<p class="hint">안전장치 숫자는 🙊 친구만 알아요. 🙉 친구가 알려 주는 숫자를 눌러야 채워져요.</p>
+          <div class="keys">${g.pumpKeys.map(n => `<button class="key pumpbtn" data-n="${n}" ${g.over ? 'disabled' : ''}><span class="braille">${braille(n)}</span></button>`).join('')}</div>`
+        : `<button class="big small pumpbtn" ${g.over ? 'disabled' : ''}>💪 펌프</button>`}</div>` : ''}
       <p class="hint">🙈 색과 그림은 보이지 않아요. 숫자는 점자예요. 🙉 친구가 알려 주는 대로 해체하세요.</p>
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : blindHtml(m, i, g.over)}</div>`).join('')}
       <div class="chart">${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}</div>`;
@@ -596,7 +611,7 @@ function render() {
     view.querySelectorAll('.btnpress').forEach(b => b.onclick = () => act({ t: 'btnpress', m: +b.dataset.m }));
     view.querySelectorAll('.btnok').forEach(b => b.onclick = () => act({ t: 'btnok', m: +b.dataset.m }));
     view.querySelectorAll('.playsound').forEach(b => b.onclick = () => playPattern(g.modules[+b.dataset.m].pattern));
-    view.querySelectorAll('.pumpbtn').forEach(b => b.onclick = () => act({ t: 'pump' }));
+    view.querySelectorAll('.pumpbtn').forEach(b => b.onclick = () => act({ t: 'pump', n: b.dataset.n ? +b.dataset.n : undefined }));
   }
 }
 
