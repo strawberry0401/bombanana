@@ -68,6 +68,16 @@
                 border: 2px solid var(--line); border-radius: 12px; }
   .join .big { width: auto; padding: 12px 20px; margin: 0; }
   .roles { font-size: 0.9rem; line-height: 1.6; }
+  .voicebar { text-align: center; font-size: 0.9rem; margin: 6px 0; }
+  .roleline { text-align: center; font-size: 1.05rem; margin: 0 0 10px; padding: 8px; border-radius: 10px; background: #fff1cf; }
+  /* 🙈 안 보이는 원숭이: 세상이 까맣고 흑백, 해체 화면만 보여요 */
+  body.blindmode { background: #000; color: #ddd; filter: grayscale(1); }
+  body.blindmode h1, body.blindmode .room, body.blindmode.room-mode .tabs, body.blindmode #restartBtn { display: none; }
+  body.blindmode .card, body.blindmode .module { background: #111; border-color: #333; }
+  body.blindmode .hint, body.blindmode .hud { color: #aaa; }
+  body.blindmode .roleline { background: #222; }
+  body.blindmode .key, body.blindmode .chart div { background: #222; color: #eee; border-color: #555; }
+  body.blindmode .pump { background: #1a1a1a; }
 </style>
 </head>
 <body>
@@ -85,7 +95,7 @@
       <button class="big ghost" id="practiceBtn">한 기기로 연습하기</button>
     </div>
     <div class="card roles">
-      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요.<br>
+      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요. 각자 이어폰을 끼고 게임 안 음성 채팅으로 이야기하고, 역할은 단계마다 랜덤으로 바뀌어요.<br>
       🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락, 고개, 손짓으로만 알려 줘요.<br>
       🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말과 폭탄 소리는 못 들어요.<br>
       🙈 <b>눈이 안 보이는 원숭이</b>: 색과 그림을 볼 수 없고 숫자는 점자로만 보여요. 소리는 들을 수 있어요. 이 친구만 폭탄을 만질 수 있어요.
@@ -95,6 +105,7 @@
   <!-- 게임 화면 -->
   <section id="game" class="hidden">
     <div class="room" id="roomLine"></div>
+    <div class="voicebar" id="voiceBar"></div>
     <div class="hud">
       <span>단계 <span id="round">-</span> / 20</span>
       <span>⏱ <span id="time">3:00</span></span>
@@ -141,8 +152,6 @@ const keysWith = ans => shuffle([ans, ...shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9].fil
 const count = (ws, c) => ws.filter(w => w.color === c).length;
 const firstOf = (ws, c) => ws.findIndex(w => w.color === c);
 const lastOf = (ws, c) => ws.map(w => w.color).lastIndexOf(c);
-const maxNumAt = ws => ws.reduce((m, w, i) => (w.num > ws[m].num ? i : m), 0);
-const minNumAt = ws => ws.reduce((m, w, i) => (w.num < ws[m].num ? i : m), 0);
 
 // 규칙: text = 설명서 문장, when = 조건, cut = 몇 번째(0부터) 선을 자를지
 const RULES_1 = [
@@ -159,23 +168,21 @@ const RULES_2 = [
 const RULES_3 = [
   { text: '검정 선이 2개 이상이면 → <b>첫 번째 검정 선</b>', when: ws => count(ws, 'black') >= 2, cut: ws => firstOf(ws, 'black') },
   { text: '노란 선이 딱 1개면 → <b>그 노란 선</b>', when: ws => count(ws, 'yellow') === 1, cut: ws => firstOf(ws, 'yellow') },
-  { text: '첫 번째 선의 숫자가 홀수면 → <b>세 번째</b> 선', when: ws => ws[0].num % 2 === 1, cut: () => 2 },
-  { text: '빨간 선이 파란 선보다 많으면 → <b>마지막 빨간 선</b>', when: ws => count(ws, 'red') > count(ws, 'blue'), cut: ws => lastOf(ws, 'red') },
+  { text: '빨간 선이 하나도 없으면 → <b>마지막</b> 선', when: ws => count(ws, 'red') === 0, cut: ws => ws.length - 1 },
   { text: '그 밖의 경우 → <b>두 번째</b> 선', when: () => true, cut: () => 1 },
 ];
 const RULES_4 = [
   { text: '하얀 선이 하나도 없으면 → <b>마지막</b> 선', when: ws => count(ws, 'white') === 0, cut: ws => ws.length - 1 },
-  { text: '숫자가 가장 큰 선이 빨강이면 → <b>숫자가 가장 큰</b> 선', when: ws => ws[maxNumAt(ws)].color === 'red', cut: maxNumAt },
   { text: '노란 선이 2개 이상이면 → <b>첫 번째 노란 선</b>', when: ws => count(ws, 'yellow') >= 2, cut: ws => firstOf(ws, 'yellow') },
   { text: '첫 번째 선과 마지막 선의 색이 같으면 → <b>두 번째</b> 선', when: ws => ws[0].color === ws[ws.length - 1].color, cut: () => 1 },
-  { text: '짝수가 적힌 선이 3개 이상이면 → <b>숫자가 가장 작은</b> 선', when: ws => ws.filter(w => w.num % 2 === 0).length >= 3, cut: minNumAt },
-  { text: '그 밖의 경우 → <b>세 번째</b> 선', when: () => true, cut: () => 2 },
+  { text: '숫자 9가 적힌 선이 있으면 → <b>9가 적힌</b> 선', when: ws => ws.some(w => w.num === 9), cut: ws => ws.findIndex(w => w.num === 9) },
+  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
 ];
 function wireTier(level) {
   if (level <= 6)  return { min: 3, max: 4, colors: ['red', 'blue', 'yellow'], rules: RULES_1 };
   if (level <= 12) return { min: 4, max: 5, colors: ['red', 'blue', 'yellow', 'white'], rules: RULES_2 };
-  if (level <= 16) return { min: 5, max: 6, colors: Object.keys(COLORS), rules: RULES_3 };
-  return { min: 6, max: 7, colors: Object.keys(COLORS), rules: RULES_4 };
+  if (level <= 16) return { min: 4, max: 5, colors: Object.keys(COLORS), rules: RULES_3 };
+  return { min: 5, max: 6, colors: Object.keys(COLORS), rules: RULES_4 };
 }
 
 // ===== 폭탄 2: 버튼 누르기 =====
@@ -240,12 +247,12 @@ function levelPlan(level) {
   if (intro[level]) types = intro[level];
   else if (known[level]) types = [pick(ALL_TYPES.slice(0, known[level]))];
   else types = shuffle(ALL_TYPES).slice(0, level <= 16 ? 2 : 3);
-  const drain = level < 5 ? 0 : level <= 10 ? 6 : level <= 16 ? 8 : 11; // 1초마다 줄어드는 안전장치
+  const drain = level < 5 ? 0 : level <= 10 ? 4 : level <= 16 ? 5 : 6; // 1초마다 줄어드는 안전장치
   return { types, drain };
 }
-const PUMP_ADD = 25;
+const PUMP_ADD = 30;
 const PUMP_CODE_LEVEL = 11;   // 11단계부터는 안전장치 숫자를 맞혀야 펌프가 돼요
-const PUMP_CODE_EVERY = 20;   // 안전장치 숫자는 20초마다 바뀌어요
+const PUMP_CODE_EVERY = 30;   // 안전장치 숫자는 30초마다 바뀌어요
 function newPumpCode(g) { g.pumpKey = 1 + Math.floor(Math.random() * 9); g.pumpKeys = keysWith(g.pumpKey); }
 
 // ===== 내 정보 =====
@@ -262,6 +269,12 @@ let timerId = null;
 
 function startLevel(level) {
   const plan = levelPlan(level);
+  // 방 모드에서는 단계마다 역할을 랜덤으로 바꿔요
+  const ids = Object.values(shared.players);
+  if (mode !== 'practice' && ids.length === 3) {
+    const [a, b, c] = shuffle(ids);
+    shared.players = { mute: a, deaf: b, blind: c };
+  }
   shared.game = {
     level, strikes: 0, timeLeft: TIME_LIMIT, over: false, cleared: false,
     drain: plan.drain, safety: 100,
@@ -382,6 +395,7 @@ function send(payload) {
 }
 
 function onMessage(payload) {
+  if (payload.kind === 'voice') { onVoice(payload); return; }
   if (payload.kind === 'action' && mode === 'host') handle(payload.action);
   if (payload.kind === 'state' && mode === 'guest') {
     shared = payload.shared;
@@ -446,9 +460,83 @@ function showGameMessage(text, kind) {
   el.className = 'msg ' + (kind || '');
 }
 
+// ===== 게임 안 음성 채팅 (WebRTC, 신호는 Supabase 채널로 주고받아요) =====
+const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+let localStream = null, voiceOn = false, voiceDenied = false;
+const peers = {}; // 친구 id → { pc, audio, pending }
+
+async function enableVoice() {
+  try {
+    localStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+  } catch (e) { voiceDenied = true; render(); return; }
+  voiceOn = true;
+  sendVoice('hello');
+  applyVoiceRules();
+  render();
+}
+
+function sendVoice(t, to, data) { send({ kind: 'voice', t, from: myId, to, data }); }
+
+function peerFor(id) {
+  if (peers[id]) return peers[id];
+  const pc = new RTCPeerConnection(ICE);
+  const audio = new Audio();
+  audio.autoplay = true;
+  localStream.getTracks().forEach(tr => pc.addTrack(tr, localStream));
+  pc.ontrack = e => { audio.srcObject = e.streams[0]; audio.play().catch(() => {}); applyVoiceRules(); };
+  pc.onicecandidate = e => { if (e.candidate) sendVoice('ice', id, e.candidate.toJSON()); };
+  pc.onconnectionstatechange = () => {
+    if (['failed', 'closed'].includes(pc.connectionState)) { delete peers[id]; sendVoice('hello'); }
+    render();
+  };
+  return (peers[id] = { pc, audio, pending: [] });
+}
+
+async function callPeer(id) {
+  const { pc } = peerFor(id);
+  await pc.setLocalDescription(await pc.createOffer());
+  sendVoice('offer', id, { type: pc.localDescription.type, sdp: pc.localDescription.sdp });
+}
+
+async function flushIce(peer) {
+  for (const c of peer.pending.splice(0)) { try { await peer.pc.addIceCandidate(c); } catch (e) {} }
+}
+
+async function onVoice(p) {
+  if (!voiceOn || p.from === myId || (p.to && p.to !== myId)) return;
+  if (p.t === 'hello' || p.t === 'hi') {
+    if (p.t === 'hello') sendVoice('hi', p.from);
+    if (!peers[p.from] && myId < p.from) callPeer(p.from); // 두 기기 중 id가 작은 쪽이 전화를 걸어요
+  } else if (p.t === 'offer') {
+    const peer = peerFor(p.from);
+    await peer.pc.setRemoteDescription(p.data);
+    await peer.pc.setLocalDescription(await peer.pc.createAnswer());
+    sendVoice('answer', p.from, { type: peer.pc.localDescription.type, sdp: peer.pc.localDescription.sdp });
+    flushIce(peer);
+  } else if (p.t === 'answer' && peers[p.from]) {
+    await peers[p.from].pc.setRemoteDescription(p.data);
+    flushIce(peers[p.from]);
+  } else if (p.t === 'ice') {
+    const peer = peerFor(p.from);
+    peer.pending.push(p.data);
+    if (peer.pc.remoteDescription) flushIce(peer);
+  }
+}
+
+// 역할에 따라: 🙊는 내 마이크가 꺼지고, 🙉는 친구 목소리와 게임 소리가 안 들려요
+const inRound = () => mode !== 'practice' && shared.game && !shared.game.over;
+function applyVoiceRules() {
+  if (!localStream) return;
+  const micOn = !(inRound() && myRole === 'mute');
+  const hearOn = !(inRound() && myRole === 'deaf');
+  localStream.getAudioTracks().forEach(tr => { tr.enabled = micOn; });
+  Object.values(peers).forEach(p => { p.audio.muted = !hearOn; });
+}
+
 // ===== 소리 내기 (🙈 기기에서만) =====
 let audioCtx = null;
 function playPattern(pattern) {
+  if (myRole === 'deaf') return; // 🙉는 게임 소리도 들리지 않아요
   audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
   [...pattern].forEach((ch, i) => {
     const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
@@ -540,6 +628,13 @@ function render() {
   if (mode === 'practice') roomLine.innerHTML = '연습 모드: 위 버튼으로 화면을 바꿔 가며 해 보세요';
   else roomLine.innerHTML = `방 번호 <b>${roomCode}</b>` + (mode === 'host' ? ' · 이 기기가 방장이에요 (끄면 게임이 멈춰요)' : '');
 
+  // 방장이 정해 준 내 역할 (단계마다 바뀌어요)
+  if (mode !== 'practice') {
+    const mine = Object.keys(shared.players).find(r => shared.players[r] === myId);
+    if (mine) myRole = mine;
+  }
+  const playing = !!shared.game && mode !== 'practice';
+
   // 원숭이 고르기 버튼
   document.querySelectorAll('#tabs button').forEach(b => {
     const r = b.dataset.role;
@@ -548,8 +643,26 @@ function render() {
     const small = b.querySelector('small');
     if (mode === 'practice') { small.textContent = ''; b.disabled = false; return; }
     small.textContent = holder === myId ? '나' : holder ? '친구가 골랐어요' : '비어 있어요';
-    b.disabled = !!holder && holder !== myId;
+    b.disabled = (!!holder && holder !== myId) || playing; // 게임 중에는 방장이 역할을 정해요
   });
+
+  // 음성 채팅 상태
+  const voiceBar = document.getElementById('voiceBar');
+  if (mode === 'practice') voiceBar.innerHTML = '';
+  else if (!voiceOn) voiceBar.innerHTML = voiceDenied
+    ? '🎤 마이크를 쓸 수 없어요. 브라우저에서 마이크를 허용하고 새로고침해 주세요.'
+    : '<button class="big small" id="voiceBtn">🎧 음성 채팅 켜기 (이어폰을 껴 주세요)</button>';
+  else {
+    const n = Object.values(peers).filter(p => p.pc.connectionState === 'connected').length;
+    const note = inRound() && myRole === 'mute' ? ' · 🔇 이번 단계는 내 마이크가 꺼져요'
+      : inRound() && myRole === 'deaf' ? ' · 🔇 이번 단계는 친구 목소리와 게임 소리가 안 들려요' : '';
+    voiceBar.innerHTML = `🎧 음성 연결된 친구 <b>${n}</b>명${note}`;
+  }
+  applyVoiceRules();
+
+  // 🙈 역할일 때는 까만 흑백 화면
+  document.body.classList.toggle('blindmode', !!shared.game && !shared.game.over && myRole === 'blind');
+  document.body.classList.toggle('room-mode', mode !== 'practice');
 
   const g = shared.game;
   document.getElementById('round').textContent = g ? g.level : '-';
@@ -577,28 +690,29 @@ function render() {
   if (!g) {
     const filled = Object.keys(shared.players).length;
     view.innerHTML = `<p>나는 <b>${ROLE_NAMES[myRole]}</b>예요.</p>
-      <p class="hint">${mode === 'practice' ? '게임 시작을 누르면 폭탄이 나타나요.' : `세 명이 모두 고르면 게임 시작을 눌러요. (${filled} / 3명)`}</p>`;
+      <p class="hint">${mode === 'practice' ? '게임 시작을 누르면 폭탄이 나타나요.' : `세 명이 모두 고르면 게임 시작을 눌러요. (${filled} / 3명) 역할은 단계마다 랜덤으로 바뀌어요.`}</p>`;
     return;
   }
 
   const left = g.modules.filter(m => !m.solved).length;
+  const roleLine = mode !== 'practice' ? `<p class="roleline">${g.level}단계에서 나는 <b>${ROLE_NAMES[myRole]}</b></p>` : '';
   const head = (m, i) => `<h3>${g.modules.length > 1 ? String.fromCharCode(65 + i) + '. ' : ''}${MODULE_NAMES[m.type]}${m.solved ? ' ✅ 해체 완료' : ''}</h3>`;
 
   if (myRole === 'mute') {
-    view.innerHTML = `<div class="manual">
+    view.innerHTML = roleLine + `<div class="manual">
       <p class="hint">🙊 말은 못 해요. 손가락 숫자, 고개 방향, 손짓으로만 알려 주세요.</p>
-      ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">20초마다 바뀌어요. 🙉 친구에게 손가락으로 알려 줘요.</span></div>` : ''}
+      ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">30초마다 바뀌어요. 🙉 친구에게 손가락으로 알려 줘요.</span></div>` : ''}
       <b>📖 ${g.level}단계 설명서</b> · 남은 폭탄 ${left}개
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : manualHtml(m, g.level)}</div>`).join('')}
     </div>`;
   } else if (myRole === 'deaf') {
-    view.innerHTML = `
+    view.innerHTML = roleLine + `
       ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 줄어들면 🙈 친구에게 "펌프!"라고 말해 줘요.${g.pumpKey ? ' 🙊 친구가 손으로 알려 주는 안전장치 숫자도 함께 전해 줘요.' : ''}
         <div class="gauge"><div class="${g.safety <= 30 ? 'low' : ''}" style="width:${Math.max(0, g.safety)}%"></div></div></div>` : ''}
       <p class="hint">🙉 친구들 말은 들리지 않아요. 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요.</p>
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : deafHtml(m)}</div>`).join('')}`;
   } else {
-    view.innerHTML = `
+    view.innerHTML = roleLine + `
       ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 나는 안전장치가 얼마나 남았는지 볼 수 없어요. 🙉 친구가 "펌프!"라고 하면 눌러요.
         ${g.pumpKey ? `<p class="hint">안전장치 숫자는 🙊 친구만 알아요. 🙉 친구가 알려 주는 숫자를 눌러야 채워져요.</p>
           <div class="keys">${g.pumpKeys.map(n => `<button class="key pumpbtn" data-n="${n}" ${g.over ? 'disabled' : ''}><span class="braille">${braille(n)}</span></button>`).join('')}</div>`
@@ -626,6 +740,7 @@ document.getElementById('restartBtn').onclick = () => act({ t: 'restart' });
 document.getElementById('createBtn').onclick = createRoom;
 document.getElementById('joinBtn').onclick = joinRoom;
 document.getElementById('practiceBtn').onclick = startPractice;
+document.getElementById('voiceBar').onclick = e => { if (e.target.id === 'voiceBtn') enableVoice(); };
 </script>
 </body>
 </html>
