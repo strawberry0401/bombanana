@@ -261,7 +261,6 @@ const myId = Math.random().toString(36).slice(2, 10);
 let mode = null;      // 'host' | 'guest' | 'practice'
 let roomCode = null;
 let myRole = null;
-let channel = null;
 let gotState = false; // 손님 기기가 방장에게서 상태를 받았는지
 
 // ===== 공유 상태: 방장(host) 기기가 가지고 있고, 바뀔 때마다 모두에게 보내요 =====
@@ -392,7 +391,7 @@ function broadcastState() {
 }
 
 function send(payload) {
-  if (channel) channel.send({ type: 'broadcast', event: 'msg', payload });
+  if (db) db.from('room_messages').insert({ room: roomCode, payload: { ...payload, sender: myId } }).then(() => {});
 }
 
 function onMessage(payload) {
@@ -407,17 +406,37 @@ function onMessage(payload) {
   }
 }
 
+// 학교망에서는 실시간(WebSocket) 연결이 끊기는 경우가 있어서, 모든 기기가 같은 방식으로
+// 메시지 표에 쓰고 0.4초마다 새 메시지를 확인해요 (일반 인터넷 요청이라 잘 막히지 않아요)
+let db = null, lastMsgId = 0;
+
 function connect(code, onReady) {
-  const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-  channel = client.channel('bombanana-' + code, { config: { broadcast: { self: false } } });
-  channel.on('broadcast', { event: 'msg' }, ({ payload }) => onMessage(payload));
-  channel.subscribe((status, err) => {
-    if (status === 'SUBSCRIBED') onReady();
-    else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-      console.warn('채널 연결 실패', status, err);
-      showGameMessage(`연결이 안 돼요. 인터넷을 확인하고 다시 들어와 주세요. (${status}${err && err.message ? ': ' + err.message : ''})`, 'bad');
-    }
-  });
+  db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  startPolling(onReady);
+}
+
+async function startPolling(onReady) {
+  const { data, error } = await db.from('room_messages').select('id').eq('room', roomCode).order('id', { ascending: false }).limit(1);
+  if (error) { showGameMessage('연결이 안 돼요. 인터넷을 확인하고 다시 들어와 주세요. (' + error.message + ')', 'bad'); return; }
+  lastMsgId = data.length ? data[0].id : 0;
+  const startId = lastMsgId; // 들어오기 전 메시지는 읽지 않아요
+  onReady();
+  // 거의 동시에 쓰인 메시지가 늦게 보일 수 있어서, 조금 앞부터 다시 읽고 이미 본 건 건너뛰어요
+  const seen = new Set();
+  const poll = async () => {
+    try {
+      const { data: rows } = await db.from('room_messages').select('id,payload').eq('room', roomCode)
+        .gt('id', Math.max(0, lastMsgId - 30)).order('id').limit(200);
+      for (const r of rows || []) {
+        if (r.id <= startId || seen.has(r.id)) continue;
+        seen.add(r.id);
+        lastMsgId = Math.max(lastMsgId, r.id);
+        if (r.payload.sender !== myId) onMessage(r.payload);
+      }
+    } catch (e) { console.warn('메시지 확인 실패, 다시 시도해요', e); }
+    setTimeout(poll, 400);
+  };
+  poll();
 }
 
 // ===== 방 만들기 / 들어가기 / 연습 =====
