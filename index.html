@@ -633,7 +633,13 @@ function showGameMessage(text, kind) {
 // ===== 게임 안 음성 채팅 (WebRTC, 신호는 Supabase 채널로 주고받아요) =====
 // 휴대폰 데이터(LTE/5G)나 학교 방화벽에서는 기기끼리 바로 연결이 안 돼서 중계(TURN) 서버가 필요해요.
 // TURN_SERVERS에 중계 서버 정보를 넣으면 그 서버를 거쳐 연결해요.
-const TURN_SERVERS = [];
+const TURN_USER = '41e96c9d72164da63947f6e8', TURN_PASS = 'eDnXclfKQtSH1c/W'; // Metered 무료 TURN (월 50GB)
+const TURN_SERVERS = [
+  { urls: 'stun:stun.relay.metered.ca:80' },
+  ...['turn:global.relay.metered.ca:80', 'turn:global.relay.metered.ca:80?transport=tcp',
+      'turn:global.relay.metered.ca:443', 'turns:global.relay.metered.ca:443?transport=tcp']
+    .map(urls => ({ urls, username: TURN_USER, credential: TURN_PASS })),
+];
 const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...TURN_SERVERS] };
 let localStream = null, voiceOn = false, voiceError = null, listenOnly = false;
 const peers = {}; // 친구 id → { pc, audio, pending }
