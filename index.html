@@ -57,6 +57,11 @@
   .braille[data-read]:hover::after { content: attr(data-read); position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 4px;
     background: #fff; color: #111; border: 2px solid #111; border-radius: 8px; padding: 2px 8px; font-size: 1.1rem; font-weight: bold; letter-spacing: 0; white-space: nowrap; z-index: 5; pointer-events: none; }
   }
+  .result h2 { text-align: center; margin: 4px 0 10px; font-size: 1.25rem; }
+  .result table { width: 100%; border-collapse: collapse; text-align: center; }
+  .result th, .result td { padding: 6px; border-bottom: 1px solid var(--line); }
+  .result tr.boom td { color: #e03131; }
+  .result tr.total td { font-weight: bold; font-size: 1.1rem; border-top: 2px solid var(--ink); }
   .chart { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 12px; text-align: center; font-size: 0.8rem; }
   .chart div { border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
   .chart .braille { font-size: 1.2rem; }
@@ -140,7 +145,7 @@
       <button class="big ghost" id="practiceBtn">한 기기로 연습하기</button>
     </div>
     <div class="card roles">
-      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요. 각자 이어폰을 끼고 게임 안 음성 채팅으로 이야기하고, 역할은 단계마다 랜덤으로 바뀌어요.<br>
+      세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계예요. 3분 안에 해체하면 A, 5분 안이면 B, 7분 안이면 C 등급이고, 7분이 지나면 폭탄이 터져요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요. 각자 이어폰을 끼고 게임 안 음성 채팅으로 이야기하고, 역할은 단계마다 랜덤으로 바뀌어요.<br>
       🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 감정표현으로만 알려 줘요.<br>
       🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말과 폭탄 소리는 못 들어요.<br>
       🙈 <b>눈이 안 보이는 원숭이</b>: 색과 그림을 볼 수 없고 숫자는 점자로만 보여요. 소리는 들을 수 있어요. 이 친구만 폭탄을 만질 수 있어요.
@@ -155,7 +160,7 @@
     <div class="mutebanner">🤐 이번 단계는 내 마이크가 꺼져 있어요. 감정표현으로만 알려 주세요.</div>
     <div class="hud">
       <span>단계 <span id="round">-</span> / 20</span>
-      <span>⏱ <span id="time">3:00</span></span>
+      <span>⏱ <span id="time">0:00</span> <small id="grade"></small></span>
       <span>실수 <span id="strikes">⚪⚪⚪</span></span>
     </div>
     <div class="tabs" id="tabs">
@@ -214,7 +219,11 @@ const COLORS = {
 const BRAILLE_DIGITS = { 1: '⠁', 2: '⠃', 3: '⠉', 4: '⠙', 5: '⠑', 6: '⠋', 7: '⠛', 8: '⠓', 9: '⠊' };
 const braille = n => '⠼' + BRAILLE_DIGITS[n];
 const ROLE_NAMES = { mute: '🙊 말을 못 하는 원숭이', deaf: '🙉 안 들리는 원숭이', blind: '🙈 안 보이는 원숭이' };
-const TOTAL_LEVELS = 20, MAX_STRIKES = 3, TIME_LIMIT = 180;
+const IS_TOUCH = matchMedia('(hover: none)').matches; // 휴대폰, 태블릿
+const TOTAL_LEVELS = 20, MAX_STRIKES = 3, TIME_LIMIT = 420; // 7분이 지나면 폭탄이 터져요
+// 해체한 시간으로 등급과 점수를 줘요: 3분 안 A, 5분 안 B, 7분 안 C
+const GRADES = [{ g: 'A', until: 180, pts: 100 }, { g: 'B', until: 300, pts: 70 }, { g: 'C', until: 420, pts: 40 }];
+const gradeAt = elapsed => GRADES.find(x => elapsed <= x.until) || GRADES[GRADES.length - 1];
 
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const shuffle = arr => arr.map(v => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(p => p[1]);
@@ -387,7 +396,7 @@ function startLevel(level) {
 function strike(text) {
   const g = shared.game;
   g.strikes++;
-  if (g.strikes >= MAX_STRIKES) endLevel(false, '실수 3번! 💥 펑! 이 단계를 다시 해 봐요.');
+  if (g.strikes >= MAX_STRIKES) endLevel(false, '실수 3번! 💥 펑! 폭탄이 터졌어요.');
   else setMsg(text, 'bad');
 }
 
@@ -419,7 +428,7 @@ function handle(action) {
       if (mode !== 'practice' && Object.keys(shared.players).length < 3) return; // 세 원숭이가 모두 있어야 해요
       if (!g) startLevel(1);
       else if (g.cleared && g.level < TOTAL_LEVELS) startLevel(g.level + 1);
-      else if (g.cleared) startLevel(1);
+      else if (g.cleared) { shared.scores = {}; startLevel(1); }
       else if (g.over) startLevel(g.level);
       else return;
       setMsg('');
@@ -430,6 +439,7 @@ function handle(action) {
       setMsg('');
       break;
     case 'restart':
+      shared.scores = {};
       startLevel(1);
       setMsg('');
       break;
@@ -441,7 +451,7 @@ function handle(action) {
         g.safety -= g.drain;
         if (g.safety <= 0) { g.safety = 100; strike('안전장치가 바닥났어요! ⚠️ 펌프를 계속 눌러 줘요.'); }
       }
-      if (!g.over && g.timeLeft <= 0) endLevel(false, '시간이 다 됐어요! 💥 펑! 이 단계를 다시 해 봐요.');
+      if (!g.over && g.timeLeft <= 0) endLevel(false, '7분이 지났어요! 💥 펑! 폭탄이 터졌어요.');
       break;
     case 'emote': // 🙊만 감정표현을 보낼 수 있어요
       if (!EMOTES[action.e] || (mode !== 'practice' && shared.players.mute !== action.id)) return;
@@ -478,10 +488,31 @@ function handle(action) {
 }
 
 function endLevel(win, text) {
-  shared.game.over = true;
-  shared.game.cleared = win;
+  const g = shared.game;
+  g.over = true;
+  g.cleared = win;
   clearInterval(timerId);
+  shared.scores = shared.scores || {};
+  if (win) {
+    const gr = gradeAt(TIME_LIMIT - g.timeLeft);
+    shared.scores[g.level] = { grade: gr.g, pts: gr.pts };
+    text = text.replace("성공!", `성공! ${gr.g}등급 (${gr.pts}점)`);
+  } else shared.scores[g.level] = { grade: '💥', pts: 0 };
   setMsg(text, win ? 'good' : 'bad');
+}
+
+// 결과 화면: 폭탄이 터졌거나 20단계를 모두 끝냈을 때 라운드별 점수를 보여 줘요
+function resultHtml() {
+  const g = shared.game, sc = shared.scores || {};
+  const levels = Object.keys(sc).map(Number).sort((a, b) => a - b);
+  const total = levels.reduce((sum, l) => sum + sc[l].pts, 0);
+  return `<div class="result">
+    <h2>${g.cleared ? '🎉 20단계 모두 해체했어요!' : `💥 ${g.level}단계에서 폭탄이 터졌어요`}</h2>
+    <table><tr><th>단계</th><th>등급</th><th>점수</th></tr>
+      ${levels.map(l => `<tr class="${sc[l].pts ? '' : 'boom'}"><td>${l}단계</td><td><b>${sc[l].grade}</b></td><td>${sc[l].pts}점</td></tr>`).join('')}
+      <tr class="total"><td>합계</td><td></td><td>${total}점</td></tr></table>
+    <p class="hint">등급: 3분 안 A (100점) · 5분 안 B (70점) · 7분 안 C (40점) · 7분이 지나거나 실수 3번이면 💥 (0점)</p>
+  </div>`;
 }
 
 function setMsg(text, kind) { shared.msg = text; shared.msgKind = kind || ''; }
@@ -600,7 +631,10 @@ function showGameMessage(text, kind) {
 }
 
 // ===== 게임 안 음성 채팅 (WebRTC, 신호는 Supabase 채널로 주고받아요) =====
-const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+// 휴대폰 데이터(LTE/5G)나 학교 방화벽에서는 기기끼리 바로 연결이 안 돼서 중계(TURN) 서버가 필요해요.
+// TURN_SERVERS에 중계 서버 정보를 넣으면 그 서버를 거쳐 연결해요.
+const TURN_SERVERS = [];
+const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }, ...TURN_SERVERS] };
 let localStream = null, voiceOn = false, voiceError = null, listenOnly = false;
 const peers = {}; // 친구 id → { pc, audio, pending }
 
@@ -832,7 +866,9 @@ function render() {
     const n = Object.values(peers).filter(p => p.pc.connectionState === 'connected').length;
     const note = inRound() && myRole === 'mute' ? ' · 🔇 이번 단계는 내 마이크가 꺼져요'
       : inRound() && myRole === 'deaf' ? ' · 🔇 이번 단계는 친구 목소리와 게임 소리가 안 들려요' : '';
-    voiceBar.innerHTML = `🎧 음성 연결된 친구 <b>${n}</b>명${listenOnly ? ' · 🎤 마이크 없이 듣기만 해요' : ''}${note}`;
+    const stuck = n === 0 && Object.keys(peers).length > 0
+      ? '<br><span class="hint">연결이 안 되면 모든 기기를 <b>같은 와이파이</b>에 연결해 주세요. 휴대폰 데이터로는 연결이 어려워요.</span>' : '';
+    voiceBar.innerHTML = `🎧 음성 연결된 친구 <b>${n}</b>명${listenOnly ? ' · 🎤 마이크 없이 듣기만 해요' : ''}${note}${stuck}`;
   }
   applyVoiceRules();
 
@@ -845,8 +881,10 @@ function render() {
 
   const g = shared.game;
   document.getElementById('round').textContent = g ? g.level : '-';
-  const t = g ? Math.max(0, g.timeLeft) : TIME_LIMIT;
-  document.getElementById('time').textContent = Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0');
+  const el = g ? Math.min(TIME_LIMIT, TIME_LIMIT - g.timeLeft) : 0; // 지난 시간
+  document.getElementById('time').textContent = Math.floor(el / 60) + ':' + String(el % 60).padStart(2, '0');
+  const gr = gradeAt(el);
+  document.getElementById('grade').textContent = g && !g.over ? `${gr.g}등급 (${gr.until / 60}분까지)` : '';
   const s = g ? g.strikes : 0;
   document.getElementById('strikes').textContent = '❌'.repeat(s) + '⚪'.repeat(MAX_STRIKES - s);
 
@@ -865,6 +903,7 @@ function render() {
   showEmote();
 
   const view = document.getElementById('view');
+  if (g && g.over && (!g.cleared || g.level === TOTAL_LEVELS)) { view.innerHTML = resultHtml(); return; }
   if (!myRole) {
     const filled = Object.keys(shared.players).length;
     view.innerHTML = `<p class="hint">위에서 내가 맡을 원숭이를 골라 주세요. (${filled} / 3명 골랐어요)</p>`;
@@ -909,6 +948,7 @@ function render() {
           <div class="keys">${g.pumpKeys.map(n => `<button class="key pumpbtn" data-n="${n}" ${g.over ? 'disabled' : ''}><span class="braille" data-read="${n}">${braille(n)}</span></button>`).join('')}</div>`
         : `<button class="big small pumpbtn" ${g.over ? 'disabled' : ''}>💪 펌프</button>`}</div>` : ''}
       <p class="hint">🙈 색과 그림은 보이지 않아요. 숫자는 점자예요. 🙉 친구가 알려 주는 대로 해체하세요.</p>
+      ${IS_TOUCH ? '<p class="hint touchhint">📱 점자를 <b>꾹(0.4초) 누르면</b> 화면 위쪽에 "⠑⠎⠢⠰⠍⠢ = 멈춤"처럼 읽는 법이 떠요. 꾹 누를 때는 버튼이 눌리지 않아서 실수가 생기지 않아요. <b>짧게 톡</b> 누르면 원래대로 버튼이 눌려요.</p>' : ''}
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : bombHtml(m, i, g.over, false)}</div>`).join('')}
       <div class="chart">${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}</div>
       ${g.modules.some(m => m.type === 'button' && !m.solved) ? `<div class="chart" style="grid-template-columns: repeat(4, 1fr)">${BUTTON_WORDS.map(w => `<div><span class="braille">${BUTTON_BRAILLE[w]}</span><br>${w}</div>`).join('')}</div>` : ''}`;
