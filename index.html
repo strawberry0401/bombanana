@@ -177,33 +177,31 @@ const keysWith = ans => shuffle([ans, ...shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9].fil
 
 // ===== 폭탄 1: 선 자르기 =====
 const count = (ws, c) => ws.filter(w => w.color === c).length;
-const firstOf = (ws, c) => ws.findIndex(w => w.color === c);
-const lastOf = (ws, c) => ws.map(w => w.color).lastIndexOf(c);
 
-// 규칙: text = 설명서 문장, when = 조건, cut = 몇 번째(0부터) 선을 자를지
+// 규칙: text = 설명서 문장, when = 색 조건, num = 잘라야 할 선에 적힌 숫자 (숫자는 점자라서 🙈만 찾을 수 있어요)
 const RULES_1 = [
-  { text: '빨간 선이 하나도 없으면 → <b>두 번째</b> 선', when: ws => count(ws, 'red') === 0, cut: () => 1 },
-  { text: '마지막 선이 파랑이면 → <b>마지막</b> 선', when: ws => ws[ws.length - 1].color === 'blue', cut: ws => ws.length - 1 },
-  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
+  { text: '빨간 선이 하나도 없으면 → 숫자 <b>3</b>', when: ws => count(ws, 'red') === 0, num: 3 },
+  { text: '마지막 선이 파랑이면 → 숫자 <b>7</b>', when: ws => ws[ws.length - 1].color === 'blue', num: 7 },
+  { text: '그 밖의 경우 → 숫자 <b>5</b>', when: () => true, num: 5 },
 ];
 const RULES_2 = [
-  { text: '빨간 선이 하나도 없으면 → <b>두 번째</b> 선', when: ws => count(ws, 'red') === 0, cut: () => 1 },
-  { text: '마지막 선이 하양이면 → <b>마지막</b> 선', when: ws => ws[ws.length - 1].color === 'white', cut: ws => ws.length - 1 },
-  { text: '파란 선이 2개 이상이면 → <b>마지막 파란 선</b>', when: ws => count(ws, 'blue') >= 2, cut: ws => lastOf(ws, 'blue') },
-  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
+  { text: '빨간 선이 하나도 없으면 → 숫자 <b>2</b>', when: ws => count(ws, 'red') === 0, num: 2 },
+  { text: '마지막 선이 하양이면 → 숫자 <b>8</b>', when: ws => ws[ws.length - 1].color === 'white', num: 8 },
+  { text: '파란 선이 2개 이상이면 → 숫자 <b>4</b>', when: ws => count(ws, 'blue') >= 2, num: 4 },
+  { text: '그 밖의 경우 → 숫자 <b>6</b>', when: () => true, num: 6 },
 ];
 const RULES_3 = [
-  { text: '검정 선이 2개 이상이면 → <b>첫 번째 검정 선</b>', when: ws => count(ws, 'black') >= 2, cut: ws => firstOf(ws, 'black') },
-  { text: '노란 선이 딱 1개면 → <b>그 노란 선</b>', when: ws => count(ws, 'yellow') === 1, cut: ws => firstOf(ws, 'yellow') },
-  { text: '빨간 선이 하나도 없으면 → <b>마지막</b> 선', when: ws => count(ws, 'red') === 0, cut: ws => ws.length - 1 },
-  { text: '그 밖의 경우 → <b>두 번째</b> 선', when: () => true, cut: () => 1 },
+  { text: '검정 선이 2개 이상이면 → 숫자 <b>9</b>', when: ws => count(ws, 'black') >= 2, num: 9 },
+  { text: '노란 선이 딱 1개면 → 숫자 <b>1</b>', when: ws => count(ws, 'yellow') === 1, num: 1 },
+  { text: '빨간 선이 하나도 없으면 → 숫자 <b>7</b>', when: ws => count(ws, 'red') === 0, num: 7 },
+  { text: '그 밖의 경우 → 숫자 <b>3</b>', when: () => true, num: 3 },
 ];
 const RULES_4 = [
-  { text: '하얀 선이 하나도 없으면 → <b>마지막</b> 선', when: ws => count(ws, 'white') === 0, cut: ws => ws.length - 1 },
-  { text: '노란 선이 2개 이상이면 → <b>첫 번째 노란 선</b>', when: ws => count(ws, 'yellow') >= 2, cut: ws => firstOf(ws, 'yellow') },
-  { text: '첫 번째 선과 마지막 선의 색이 같으면 → <b>두 번째</b> 선', when: ws => ws[0].color === ws[ws.length - 1].color, cut: () => 1 },
-  { text: '숫자 9가 적힌 선이 있으면 → <b>9가 적힌</b> 선', when: ws => ws.some(w => w.num === 9), cut: ws => ws.findIndex(w => w.num === 9) },
-  { text: '그 밖의 경우 → <b>첫 번째</b> 선', when: () => true, cut: () => 0 },
+  { text: '하얀 선이 하나도 없으면 → 숫자 <b>4</b>', when: ws => count(ws, 'white') === 0, num: 4 },
+  { text: '노란 선이 2개 이상이면 → 숫자 <b>8</b>', when: ws => count(ws, 'yellow') >= 2, num: 8 },
+  { text: '첫 번째 선과 마지막 선의 색이 같으면 → 숫자 <b>2</b>', when: ws => ws[0].color === ws[ws.length - 1].color, num: 2 },
+  { text: '빨간 선이 3개 이상이면 → 숫자 <b>9</b>', when: ws => count(ws, 'red') >= 3, num: 9 },
+  { text: '그 밖의 경우 → 숫자 <b>6</b>', when: () => true, num: 6 },
 ];
 function wireTier(level) {
   if (level <= 6)  return { min: 3, max: 4, colors: ['red', 'blue', 'yellow'], rules: RULES_1 };
@@ -240,8 +238,13 @@ function makeModule(type, level) {
   if (type === 'wires') {
     const t = wireTier(level);
     const n = t.min + Math.floor(Math.random() * (t.max - t.min + 1));
-    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9]);
-    return { type, wires: Array.from({ length: n }, (_, i) => ({ color: pick(t.colors), num: nums[i], cut: false })) };
+    const wires = Array.from({ length: n }, () => ({ color: pick(t.colors), num: 0, cut: false }));
+    // 설명서가 가리키는 숫자는 꼭 한 선에만 적히게, 자리는 아무 데나
+    const target = t.rules.find(r => r.when(wires)).num;
+    const nums = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9].filter(x => x !== target)).slice(0, n - 1);
+    nums.splice(Math.floor(Math.random() * n), 0, target);
+    wires.forEach((w, i) => w.num = nums[i]);
+    return { type, wires };
   }
   if (type === 'button') return { type, color: pick(BUTTON_COLORS), word: pick(BUTTON_WORDS), presses: 0 };
   if (type === 'sound') { const pattern = pick(Object.keys(SOUND_TABLE)); return { type, pattern, keys: keysWith(SOUND_TABLE[pattern]) }; }
@@ -255,7 +258,7 @@ function makeModule(type, level) {
 function answerOf(m, level) {
   if (m.type === 'wires') {
     const rule = wireTier(level).rules.find(r => r.when(m.wires));
-    return rule.cut(m.wires);
+    return m.wires.findIndex(w => w.num === rule.num); // 그 숫자가 적힌 선이 몇 번째인지
   }
   if (m.type === 'button') return BUTTON_RULES.find(r => r.when(m)).n;
   if (m.type === 'sound') return SOUND_TABLE[m.pattern];
@@ -667,8 +670,8 @@ setInterval(() => {
 // ===== 화면 그리기 =====
 function manualHtml(m, level) {
   if (m.type === 'wires') return `
-    <p class="hint">위에서부터 차례로 확인해서 <b>처음 맞는 규칙</b>대로 잘라요. 선은 위에서부터 첫 번째, 두 번째… 로 세요.</p>
-    <ol>${wireTier(level).rules.map(r => `<li>${r.text}을 자르세요.</li>`).join('')}</ol>`;
+    <p class="hint">🙉 친구가 말해 주는 선 색깔을 듣고, 위에서부터 차례로 확인해서 <b>처음 맞는 규칙</b>의 숫자를 감정표현으로 알려 줘요. 🙈 친구가 점자로 그 숫자가 적힌 선을 찾아 잘라요.</p>
+    <ol>${wireTier(level).rules.map(r => `<li>${r.text}${'이가이가가이이이가'[r.num - 1]} 적힌 선을 자르세요.</li>`).join('')}</ol>`;
   if (m.type === 'button') return `
     <p class="hint">버튼 색과 글자를 보고, <b>처음 맞는 규칙</b>대로 눌러요. 다 누르면 확인을 눌러요.</p>
     <ol>${BUTTON_RULES.map(r => `<li>${r.text}</li>`).join('')}</ol>`;
