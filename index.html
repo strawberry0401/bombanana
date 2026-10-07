@@ -70,9 +70,7 @@
   .roles { font-size: 0.9rem; line-height: 1.6; }
   .emotes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0; }
   .emotes button { padding: 6px 0; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; font-size: 0.8rem; color: var(--ink); line-height: 1.3; }
-  .emotes button .e { font-size: 1.4rem; display: block; }
-  .emotes button.wide { grid-column: span 5; font-size: 0.95rem; }
-  .emotes button.wide .e { display: inline; }
+  .emotes button .e { font-size: 1.6rem; display: block; padding: 4px 0; }
   #emotePop { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #fff; border: 4px solid #1c7ed6;
               border-radius: 24px; padding: 16px 28px; text-align: center; box-shadow: 0 8px 30px #0004; z-index: 10; min-width: 220px; }
   #emotePop .e { font-size: 3.2rem; display: block; line-height: 1.2; }
@@ -286,6 +284,7 @@ const EMOTES = {};
 for (let n = 1; n <= 10; n++) EMOTES[n] = { e: fingers(n), t: `손가락 ${n}개` };
 EMOTES.unsure = { e: '🤔', t: '잘 모르겠어요 (머리 긁적)' };
 EMOTES.again = { e: '🔁✋', t: '다시 해 주세요' };
+EMOTES.wait = { e: '💭⏳', t: '생각 중이에요, 기다려 주세요' };
 
 // ===== 내 정보 =====
 const myId = Math.random().toString(36).slice(2, 10);
@@ -704,7 +703,7 @@ function showEmote() {
   const mine = myRole === 'mute' && mode !== 'practice';
   if (first || !(myRole === 'deaf' || mode === 'practice' || mine)) return;
   const x = EMOTES[em.e];
-  pop.innerHTML = mine ? `<span class="t">보냈어요: ${x.e} ${x.t}</span>` : `<span class="e">${x.e}</span><span class="t">${x.t}</span>`;
+  pop.innerHTML = mine ? `<span class="t">✅ ${x.e}</span>` : `<span class="e">${x.e}</span>`; // 글자 없이 그림만 보여요
   pop.classList.remove('hidden');
   clearTimeout(emoteTimer);
   emoteTimer = setTimeout(() => pop.classList.add('hidden'), mine ? 1500 : 4000);
@@ -811,9 +810,10 @@ function render() {
       ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">30초마다 바뀌어요. 🙉 친구에게 감정표현으로 알려 줘요.</span></div>` : ''}
       <div class="module"><h3>✋ 감정표현 보내기 <span class="hint">(🙉 친구 화면에 크게 떠요)</span></h3>
         <div class="emotes">
-          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button class="emotebtn" data-e="${n}"><span class="e">${fingers(n)}</span>${n}</button>`).join('')}
-          <button class="emotebtn wide" data-e="unsure"><span class="e">🤔</span> 잘 모르겠어요</button>
-          <button class="emotebtn wide" data-e="again"><span class="e">🔁✋</span> 다시 해 주세요</button>
+          ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button class="emotebtn" data-e="${n}"><span class="e">${fingers(n)}</span></button>`).join('')}
+          <button class="emotebtn" data-e="unsure"><span class="e">🤔</span></button>
+          <button class="emotebtn" data-e="again"><span class="e">🔁✋</span></button>
+          <button class="emotebtn" data-e="wait"><span class="e">💭⏳</span></button>
         </div></div>
       <b>📖 ${g.level}단계 설명서</b> · 남은 폭탄 ${left}개
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : manualHtml(m, g.level)}</div>`).join('')}
