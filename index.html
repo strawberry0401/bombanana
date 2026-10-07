@@ -71,10 +71,12 @@
   .emotes { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; margin: 8px 0; }
   .emotes button { padding: 6px 0; border: 2px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; font-size: 0.8rem; color: var(--ink); line-height: 1.3; }
   .emotes button .e { font-size: 1.6rem; display: block; padding: 4px 0; }
+  .emotes button.wide { grid-column: 1 / -1; }
   #emotePop { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #fff; border: 4px solid #1c7ed6;
               border-radius: 24px; padding: 16px 28px; text-align: center; box-shadow: 0 8px 30px #0004; z-index: 10; min-width: 220px; }
   #emotePop .e { font-size: 3.2rem; display: block; line-height: 1.2; }
   #emotePop .t { font-size: 1.2rem; font-weight: bold; }
+  #emotePop.mine { top: 12px; bottom: auto; padding: 8px 20px; } /* 🙊 버튼을 가리지 않게 위쪽에 떠요 */
   .voicebar { text-align: center; font-size: 0.9rem; margin: 6px 0; }
   .roleline { text-align: center; font-size: 1.05rem; margin: 0 0 10px; padding: 8px; border-radius: 10px; background: #fff1cf; }
   /* 🙈 안 보이는 원숭이: 세상이 까맣고 흑백, 해체 화면만 보여요 */
@@ -704,6 +706,7 @@ function showEmote() {
   if (first || !(myRole === 'deaf' || mode === 'practice' || mine)) return;
   const x = EMOTES[em.e];
   pop.innerHTML = mine ? `<span class="t">✅ ${x.e}</span>` : `<span class="e">${x.e}</span>`; // 글자 없이 그림만 보여요
+  pop.classList.toggle('mine', mine);
   pop.classList.remove('hidden');
   clearTimeout(emoteTimer);
   emoteTimer = setTimeout(() => pop.classList.add('hidden'), mine ? 1500 : 4000);
@@ -811,9 +814,9 @@ function render() {
       <div class="module"><h3>✋ 감정표현 보내기 <span class="hint">(🙉 친구 화면에 크게 떠요)</span></h3>
         <div class="emotes">
           ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button class="emotebtn" data-e="${n}"><span class="e">${fingers(n)}</span></button>`).join('')}
-          <button class="emotebtn" data-e="unsure"><span class="e">🤔</span></button>
-          <button class="emotebtn" data-e="again"><span class="e">🔁✋</span></button>
-          <button class="emotebtn" data-e="wait"><span class="e">💭⏳</span></button>
+          <button class="emotebtn wide" data-e="unsure"><span class="e">🤔</span></button>
+          <button class="emotebtn wide" data-e="again"><span class="e">🔁✋</span></button>
+          <button class="emotebtn wide" data-e="wait"><span class="e">💭⏳</span></button>
         </div></div>
       <b>📖 ${g.level}단계 설명서</b> · 남은 폭탄 ${left}개
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : manualHtml(m, g.level)}</div>`).join('')}
