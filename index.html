@@ -278,9 +278,13 @@ const PUMP_CODE_EVERY = 30;   // 안전장치 숫자는 30초마다 바뀌어요
 function newPumpCode(g) { g.pumpKey = 1 + Math.floor(Math.random() * 9); g.pumpKeys = keysWith(g.pumpKey); }
 
 // ===== 🙊 감정표현: 손가락 1~10, 잘 모르겠어요, 다시 해 줘 =====
-function fingers(n) { // 손가락 개수를 손가락 이모티콘으로 (3은 손가락 3개를 편 🤟 하나)
-  const rest = { 0: '', 1: '☝️', 2: '✌️', 3: '🤟', 4: '✌️✌️' };
-  return '🖐️'.repeat(Math.floor(n / 5)) + rest[n % 5];
+// 손가락 4개를 편 이모티콘은 없어서, 이모티콘과 비슷한 색으로 그려요 (엄지는 접어요)
+const FOUR = `<svg viewBox="0 0 40 48" width="1em" height="1.2em" style="vertical-align:-0.2em">${[[9, 7], [16, 3], [23, 4], [30, 9]].map(([x, y]) =>
+  `<rect x="${x - 3}" y="${y}" width="6.5" height="${30 - y}" rx="3.2" fill="#ffcc4d" stroke="#e0a526" stroke-width="1.2"/>`).join('')
+  }<path d="M5 24 h30 v12 a10 10 0 0 1 -10 10 h-10 a10 10 0 0 1 -10 -10z" fill="#ffcc4d" stroke="#e0a526" stroke-width="1.2"/><rect x="8" y="31" width="16" height="6.5" rx="3.2" fill="#f4b740" stroke="#e0a526" stroke-width="1.2"/></svg>`;
+function fingers(n) { // 손가락 개수를 손가락 이모티콘으로 (3은 🤟 하나, 4는 손가락 4개 그림 하나)
+  const rest = { 0: '', 1: '☝️', 2: '✌️', 3: '🤟', 4: FOUR };
+  return '🖐️'.repeat(Math.floor(n / 5)) + '<wbr>' + rest[n % 5];
 }
 const EMOTES = {};
 for (let n = 1; n <= 10; n++) EMOTES[n] = { e: fingers(n), t: `손가락 ${n}개` };
