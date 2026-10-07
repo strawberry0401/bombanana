@@ -53,8 +53,10 @@
   .levelpick button, .levelpick select { font-size: 1rem; padding: 4px 10px; border: 2px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
   /* 🙈 화면: 점자에 마우스를 올리면 읽는 법이 떠요 */
   .braille[data-read] { position: relative; display: inline-block; }
+@media (hover: hover) {
   .braille[data-read]:hover::after { content: attr(data-read); position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 4px;
     background: #fff; color: #111; border: 2px solid #111; border-radius: 8px; padding: 2px 8px; font-size: 1.1rem; font-weight: bold; letter-spacing: 0; white-space: nowrap; z-index: 5; pointer-events: none; }
+  }
   .chart { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 12px; text-align: center; font-size: 0.8rem; }
   .chart div { border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
   .chart .braille { font-size: 1.2rem; }
@@ -115,6 +117,11 @@
   #intro li { margin-bottom: 6px; }
   #intro .ask { background: #fff9db; border-radius: 12px; padding: 8px 12px; font-size: 0.95rem; }
   .introlink { display: block; margin: 0 auto 12px; background: none; border: none; color: #e67700; font-weight: bold; text-decoration: underline; cursor: pointer; font-size: 0.95rem; }
+  /* 휴대폰: 점자를 꾹 누르면 위쪽에 읽는 법이 떠요 */
+  #readPop { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: #fff; color: #111; border: 3px solid #111; border-radius: 14px;
+             padding: 6px 18px; font-size: 1.4rem; font-weight: bold; z-index: 40; pointer-events: none; white-space: nowrap; }
+  .braille, .key, .cutbtn, .btnpress { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  button { touch-action: manipulation; }
 </style>
 </head>
 <body>
@@ -186,6 +193,7 @@
     <button class="big" id="introClose" style="margin-top:14px">약속할게요! 게임 시작하러 가기</button>
   </div>
 </div>
+<div id="readPop" class="hidden"></div>
 <div id="emotePop" class="hidden"></div>
 <script src="supabase.js"></script>
 <script>
@@ -921,6 +929,28 @@ document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
 });
 document.getElementById('startBtn').onclick = () => act({ t: 'start' });
 document.getElementById('restartBtn').onclick = () => act({ t: 'restart' });
+// 휴대폰에서는 마우스를 올릴 수 없어서, 점자를 꾹(0.4초) 누르면 읽는 법을 보여 줘요. 이때는 버튼이 눌리지 않아요
+(() => {
+  const pop = document.getElementById('readPop');
+  let timer = null, hideTimer = null, longPressed = false;
+  const target = el => el.closest('[data-read]') || (el.closest('button') && el.closest('button').querySelector('[data-read]'));
+  document.addEventListener('touchstart', e => {
+    longPressed = false;
+    const span = target(e.target);
+    if (!span) return;
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      longPressed = true;
+      pop.textContent = `${span.textContent} = ${span.dataset.read}`;
+      pop.classList.remove('hidden');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => pop.classList.add('hidden'), 2000);
+    }, 400);
+  }, { passive: true });
+  ['touchend', 'touchmove', 'touchcancel'].forEach(t => document.addEventListener(t, () => clearTimeout(timer), { passive: true }));
+  document.addEventListener('click', e => { if (longPressed) { longPressed = false; e.preventDefault(); e.stopPropagation(); } }, true);
+  document.addEventListener('contextmenu', e => { if (target(e.target)) e.preventDefault(); });
+})();
 document.getElementById('introClose').onclick = () => document.getElementById('intro').classList.add('hidden');
 document.getElementById('introOpen').onclick = () => document.getElementById('intro').classList.remove('hidden');
 const levelSel = document.getElementById('levelSel');
