@@ -49,6 +49,12 @@
   .manual ol, .manual ul { padding-left: 20px; line-height: 1.7; margin: 4px 0; }
   .manual table { border-collapse: collapse; margin: 4px 0; }
   .manual td { border: 1px solid var(--line); padding: 4px 10px; text-align: center; }
+  .levelpick { display: flex; align-items: center; justify-content: center; gap: 6px; margin: 8px 0; font-size: 0.9rem; font-weight: bold; }
+  .levelpick button, .levelpick select { font-size: 1rem; padding: 4px 10px; border: 2px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
+  /* 🙈 화면: 점자에 마우스를 올리면 읽는 법이 떠요 */
+  .braille[data-read] { position: relative; display: inline-block; }
+  .braille[data-read]:hover::after { content: attr(data-read); position: absolute; left: 50%; bottom: 100%; transform: translateX(-50%); margin-bottom: 4px;
+    background: #fff; color: #111; border: 2px solid #111; border-radius: 8px; padding: 2px 8px; font-size: 1.1rem; font-weight: bold; letter-spacing: 0; white-space: nowrap; z-index: 5; pointer-events: none; }
   .chart { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 12px; text-align: center; font-size: 0.8rem; }
   .chart div { border: 1px solid var(--line); border-radius: 8px; padding: 2px; }
   .chart .braille { font-size: 1.2rem; }
@@ -141,6 +147,11 @@
       <button data-role="deaf">🙉 안 들리는 원숭이<br>(설명)<small></small></button>
       <button data-role="blind">🙈 안 보이는 원숭이<br>(폭탄 해체)<small></small></button>
     </div>
+    <div class="levelpick hidden" id="levelPick">🧪 연습용 단계 고르기
+      <button id="lvPrev">◀</button>
+      <select id="levelSel"></select>
+      <button id="lvNext">▶</button>
+    </div>
     <div class="card" id="view"></div>
     <div class="msg" id="msg"></div>
     <button class="big" id="startBtn">게임 시작</button>
@@ -213,6 +224,8 @@ function wireTier(level) {
 // ===== 폭탄 2: 버튼 누르기 =====
 const BUTTON_COLORS = ['red', 'blue', 'yellow', 'white'];
 const BUTTON_WORDS = ['누르기', '멈춤', '폭발', '잠깐'];
+// 버튼 글자는 한글 점자로만 보여요. 점자표는 🙈 화면에만 있어요
+const BUTTON_BRAILLE = { '누르기': '⠉⠍⠐⠪⠈⠕', '멈춤': '⠑⠎⠢⠰⠍⠢', '폭발': '⠙⠭⠘⠂', '잠깐': '⠨⠢⠠⠫⠒' };
 const BUTTON_RULES = [
   { text: '글자가 "폭발"이면 → <b>1번</b> 누르기', when: m => m.word === '폭발', n: 1 },
   { text: '빨간 버튼이고 글자가 "멈춤"이면 → <b>4번</b> 누르기', when: m => m.color === 'red' && m.word === '멈춤', n: 4 },
@@ -374,6 +387,11 @@ function handle(action) {
       else if (g.cleared) startLevel(1);
       else if (g.over) startLevel(g.level);
       else return;
+      setMsg('');
+      break;
+    case 'jump': // 연습 모드에서만: 원하는 단계로 바로 가기
+      if (mode !== 'practice' || !(action.level >= 1 && action.level <= TOTAL_LEVELS)) return;
+      startLevel(action.level);
       setMsg('');
       break;
     case 'restart':
@@ -690,7 +708,7 @@ function manualHtml(m, level) {
 // 해체 화면: 🙈와 🙉가 같은 모양을 봐요. 🙉(see)는 색과 그림이 보이지만 점자는 못 읽고 만질 수 없어요. 🙈는 흑백에 점자만 보이고 만질 수 있어요
 function bombHtml(m, mi, over, see) {
   const dis = m.solved || over || see ? 'disabled' : '';
-  const label = n => `<span class="braille">${braille(n)}</span>`; // 점자는 🙈만 읽을 수 있어요
+  const label = n => `<span class="braille"${see ? '' : ` data-read="${n}"`}>${braille(n)}</span>`; // 점자는 🙈만 읽을 수 있어요 (마우스를 올리면 숫자가 떠요)
   const keys = (list, faces) => `<div class="keys">${list.map((n, k) => `<button class="key" data-m="${mi}" data-n="${n}" ${dis}>${faces ? `<span class="s" style="font-size:1.6rem">${faces[k]}</span><br>` : ''}${label(n)}</button>`).join('')}</div>`;
   if (m.type === 'wires') return m.wires.map((w, i) => `
     <div class="wire">
@@ -700,7 +718,7 @@ function bombHtml(m, mi, over, see) {
       <button class="cutbtn" data-m="${mi}" data-i="${i}" ${w.cut || dis ? 'disabled' : ''}>✂️ 자르기</button>
     </div>`).join('');
   if (m.type === 'button') return `
-    <button class="bigbutton btnpress" data-m="${mi}" style="background:${see ? COLORS[m.color].css : '#adb5bd'};color:${see && (m.color === 'white' || m.color === 'yellow') ? '#222' : '#fff'}" ${dis}>${see ? m.word : '?'}</button>
+    <button class="bigbutton btnpress" data-m="${mi}" style="background:${see ? COLORS[m.color].css : '#adb5bd'};color:${see && (m.color === 'white' || m.color === 'yellow') ? '#222' : '#fff'}" ${dis}><span class="braille" style="font-size:1.5rem;letter-spacing:1px"${see ? '' : ` data-read="${m.word}"`}>${BUTTON_BRAILLE[m.word]}</span></button>
     <div class="row"><span>누른 횟수: <b>${'●'.repeat(m.presses) || '없음'}</b></span>
       <button class="big small btnok" data-m="${mi}" ${dis}>확인</button></div>`;
   if (m.type === 'sound') return `
@@ -804,6 +822,8 @@ function render() {
     : g.cleared && g.level < TOTAL_LEVELS ? `${g.level + 1}단계 시작`
     : g.cleared ? '처음부터 다시 하기'
     : `${g.level}단계 다시 하기`;
+  document.getElementById('levelPick').classList.toggle('hidden', mode !== 'practice');
+  document.getElementById('levelSel').value = g ? g.level : 1;
   document.getElementById('restartBtn').classList.toggle('hidden', !g || !g.over || (g.cleared && g.level === TOTAL_LEVELS));
   if (mode !== 'guest' || gotState) showGameMessage(shared.msg, shared.msgKind);
 
@@ -851,11 +871,12 @@ function render() {
     view.innerHTML = roleLine + `
       ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 나는 안전장치가 얼마나 남았는지 볼 수 없어요. 🙉 친구가 "펌프!"라고 하면 눌러요.
         ${g.pumpKey ? `<p class="hint">안전장치 숫자는 🙊 친구만 알아요. 🙉 친구가 알려 주는 숫자를 눌러야 채워져요.</p>
-          <div class="keys">${g.pumpKeys.map(n => `<button class="key pumpbtn" data-n="${n}" ${g.over ? 'disabled' : ''}><span class="braille">${braille(n)}</span></button>`).join('')}</div>`
+          <div class="keys">${g.pumpKeys.map(n => `<button class="key pumpbtn" data-n="${n}" ${g.over ? 'disabled' : ''}><span class="braille" data-read="${n}">${braille(n)}</span></button>`).join('')}</div>`
         : `<button class="big small pumpbtn" ${g.over ? 'disabled' : ''}>💪 펌프</button>`}</div>` : ''}
       <p class="hint">🙈 색과 그림은 보이지 않아요. 숫자는 점자예요. 🙉 친구가 알려 주는 대로 해체하세요.</p>
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : bombHtml(m, i, g.over, false)}</div>`).join('')}
-      <div class="chart">${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}</div>`;
+      <div class="chart">${[1,2,3,4,5,6,7,8,9].map(n => `<div><span class="braille">${braille(n)}</span><br>${n}</div>`).join('')}</div>
+      ${g.modules.some(m => m.type === 'button' && !m.solved) ? `<div class="chart" style="grid-template-columns: repeat(4, 1fr)">${BUTTON_WORDS.map(w => `<div><span class="braille">${BUTTON_BRAILLE[w]}</span><br>${w}</div>`).join('')}</div>` : ''}`;
     view.querySelectorAll('.cutbtn').forEach(b => b.onclick = () => act({ t: 'cut', m: +b.dataset.m, i: +b.dataset.i }));
     view.querySelectorAll('.key').forEach(b => b.onclick = () => act({ t: 'key', m: +b.dataset.m, n: +b.dataset.n }));
     view.querySelectorAll('.btnpress').forEach(b => b.onclick = () => act({ t: 'btnpress', m: +b.dataset.m }));
@@ -873,6 +894,12 @@ document.querySelectorAll('#tabs button').forEach(b => b.onclick = () => {
 });
 document.getElementById('startBtn').onclick = () => act({ t: 'start' });
 document.getElementById('restartBtn').onclick = () => act({ t: 'restart' });
+const levelSel = document.getElementById('levelSel');
+levelSel.innerHTML = Array.from({ length: TOTAL_LEVELS }, (_, i) => `<option value="${i + 1}">${i + 1}단계</option>`).join('');
+const jumpTo = n => act({ t: 'jump', level: Math.min(TOTAL_LEVELS, Math.max(1, n)) });
+levelSel.onchange = () => jumpTo(+levelSel.value);
+document.getElementById('lvPrev').onclick = () => jumpTo((shared.game ? shared.game.level : 1) - 1);
+document.getElementById('lvNext').onclick = () => jumpTo((shared.game ? shared.game.level : 0) + 1);
 document.getElementById('createBtn').onclick = createRoom;
 document.getElementById('joinBtn').onclick = joinRoom;
 document.getElementById('practiceBtn').onclick = startPractice;
