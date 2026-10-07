@@ -116,7 +116,7 @@
     </div>
     <div class="card roles">
       세 친구가 각자 기기로 같은 방에 들어가서, 서로 다른 원숭이가 되어 폭탄을 해체해요. 폭탄은 모두 20단계이고, 단계마다 3분 안에 해체해야 해요. 어떤 폭탄도 혼자서는 풀 수 없어서, 세 원숭이가 모두 있어야 시작할 수 있어요. 각자 이어폰을 끼고 게임 안 음성 채팅으로 이야기하고, 역할은 단계마다 랜덤으로 바뀌어요.<br>
-      🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 손가락, 고개, 손짓으로만 알려 줘요.<br>
+      🙊 <b>말을 못 하는 원숭이</b>: 설명서만 볼 수 있어요. 말은 못 하고 감정표현으로만 알려 줘요.<br>
       🙉 <b>귀가 안 들리는 원숭이</b>: 폭탄 모습을 볼 수 있어요. 다른 친구 말과 폭탄 소리는 못 들어요.<br>
       🙈 <b>눈이 안 보이는 원숭이</b>: 색과 그림을 볼 수 없고 숫자는 점자로만 보여요. 소리는 들을 수 있어요. 이 친구만 폭탄을 만질 수 있어요.
     </div>
@@ -126,8 +126,8 @@
   <section id="game" class="hidden">
     <div class="room" id="roomLine"></div>
     <div class="voicebar" id="voiceBar"></div>
-    <div class="deafbanner">🔇 이번 단계는 아무 소리도 들리지 않아요. 친구의 손짓을 보세요.</div>
-    <div class="mutebanner">🤐 이번 단계는 내 마이크가 꺼져 있어요. 손짓으로만 알려 주세요.</div>
+    <div class="deafbanner">🔇 이번 단계는 아무 소리도 들리지 않아요. 🙊 친구의 감정표현을 보세요.</div>
+    <div class="mutebanner">🤐 이번 단계는 내 마이크가 꺼져 있어요. 감정표현으로만 알려 주세요.</div>
     <div class="hud">
       <span>단계 <span id="round">-</span> / 20</span>
       <span>⏱ <span id="time">3:00</span></span>
@@ -662,7 +662,7 @@ function manualHtml(m, level) {
     <p class="hint">🙉 친구가 말해 주는 불빛(짧게 •, 길게 —)을 듣고, 눌러야 할 숫자를 알려 줘요.</p>
     <table>${Object.entries(MORSE_TABLE).map(([l, v]) => `<tr><td>${v.code}</td><td><b>${v.num}</b></td></tr>`).join('')}</table>`;
   return `
-    <p class="hint">🙉 친구가 말해 주는 문양 4개 중에서, 아래 목록에 <b>가장 먼저 나오는 문양</b>을 손으로 그려서 알려 줘요.</p>
+    <p class="hint">🙉 친구가 말해 주는 문양 4개 중에서, 아래 목록에 <b>가장 먼저 나오는 문양</b>이 몇 번째인지 감정표현(손가락 숫자)으로 알려 줘요.</p>
     <p style="font-size:1.6rem;letter-spacing:6px;margin:4px 0">${SYMBOL_ORDER.join(' ')}</p>
     <p class="hint">${SYMBOL_ORDER.map(s => `${s} ${SYMBOL_NAMES[s]}`).join(', ')}</p>`;
 }
@@ -807,8 +807,8 @@ function render() {
 
   if (myRole === 'mute') {
     view.innerHTML = roleLine + `<div class="manual">
-      <p class="hint">🙊 말은 못 해요. 손가락 숫자, 고개 방향, 손짓으로만 알려 주세요.</p>
-      ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">30초마다 바뀌어요. 🙉 친구에게 손가락으로 알려 줘요.</span></div>` : ''}
+      <p class="hint">🙊 말은 못 해요. 감정표현으로 알려 주세요.</p>
+      ${g.pumpKey ? `<div class="pump">⚠️ <b>안전장치 숫자: <span style="font-size:1.5rem">${g.pumpKey}</span></b><br><span class="hint">30초마다 바뀌어요. 🙉 친구에게 감정표현으로 알려 줘요.</span></div>` : ''}
       <div class="module"><h3>✋ 감정표현 보내기 <span class="hint">(🙉 친구 화면에 크게 떠요)</span></h3>
         <div class="emotes">
           ${[1,2,3,4,5,6,7,8,9,10].map(n => `<button class="emotebtn" data-e="${n}"><span class="e">${fingers(n)}</span>${n}</button>`).join('')}
@@ -821,9 +821,9 @@ function render() {
     view.querySelectorAll('.emotebtn').forEach(b => b.onclick = () => act({ t: 'emote', e: b.dataset.e }));
   } else if (myRole === 'deaf') {
     view.innerHTML = roleLine + `
-      ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 줄어들면 🙈 친구에게 "펌프!"라고 말해 줘요.${g.pumpKey ? ' 🙊 친구가 손으로 알려 주는 안전장치 숫자도 함께 전해 줘요.' : ''}
+      ${g.drain ? `<div class="pump">⚠️ <b>안전장치</b>: 줄어들면 🙈 친구에게 "펌프!"라고 말해 줘요.${g.pumpKey ? ' 🙊 친구가 감정표현으로 알려 주는 안전장치 숫자도 함께 전해 줘요.' : ''}
         <div class="gauge"><div class="${g.safety <= 30 ? 'low' : ''}" style="width:${Math.max(0, g.safety)}%"></div></div></div>` : ''}
-      <p class="hint">🙉 🙈 친구와 똑같은 해체 화면이지만 <b>색과 그림은 나만 보여요.</b> 점자는 읽을 줄 몰라요. 친구들 말은 들리지 않으니 폭탄 모습을 말로 설명하고, 🙊 친구의 손짓을 잘 보세요. 나는 폭탄을 만질 수 없어요.</p>
+      <p class="hint">🙉 🙈 친구와 똑같은 해체 화면이지만 <b>색과 그림은 나만 보여요.</b> 점자는 읽을 줄 몰라요. 친구들 말은 들리지 않으니 폭탄 모습을 말로 설명하고, 🙊 친구가 보내는 감정표현을 잘 보세요. 나는 폭탄을 만질 수 없어요.</p>
       ${g.modules.map((m, i) => `<div class="module ${m.solved ? 'solved' : ''}">${head(m, i)}${m.solved ? '' : bombHtml(m, i, g.over, true)}</div>`).join('')}`;
   } else {
     view.innerHTML = roleLine + `
